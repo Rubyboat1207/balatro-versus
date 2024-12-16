@@ -1,0 +1,10 @@
+[manifest]
+version = "1.0.0"
+
+[[patches]]
+[patches.pattern]
+target = "game.lua"
+pattern = "self.SPEEDFACTOR = 1"
+position = "after"
+payload = "initVersusMod()"
+match_indent = true

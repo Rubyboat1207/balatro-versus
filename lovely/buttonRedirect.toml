@@ -1,0 +1,15 @@
+[manifest]
+version = "1.0.0"
+
+[[patches]]
+[patches.pattern]
+target = "engine/ui.lua"
+pattern = "G.FUNCS[self.config.button](self)"
+position = "at"
+payload = """if string.sub(self.config.button, 1, 3) == "vs_" then
+  VSMOD_GLOBALS.FUNCS[self.config.button](self)
+else
+  G.FUNCS[self.config.button](self)
+end
+"""
+match_indent = true

@@ -1,0 +1,35 @@
+[manifest]
+version = "1.0.0"
+
+[[patches]]
+[patches.pattern]
+target = "functions/UI_definitions.lua"
+pattern = "elseif tab == 'Graphics' then "
+position = "before"
+payload = """
+elseif tab == "Multiplayer" then
+    return makeMultiplayerTab()
+"""
+match_indent = true
+
+[[patches]]
+[patches.pattern]
+target = "functions/UI_definitions.lua"
+pattern = "local t = create_UIBox_generic_options({back_func = 'options',contents = {create_tabs("
+position = "before"
+payload = """
+tabs[#tabs+1] = {
+    label = "Multiplayer",
+    tab_definition_function = G.UIDEF.settings_tab,
+    tab_definition_function_args = 'Multiplayer'
+}
+"""
+match_indent = true
+
+[[patches]]
+[patches.pattern]
+target = "functions/button_callbacks.lua"
+pattern = "  if args.key == '0' then args.key = 'o' end"
+position = "at"
+payload = ""
+match_indent = true

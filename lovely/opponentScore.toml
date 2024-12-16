@@ -1,0 +1,21 @@
+[manifest]
+version = "1.0.0"
+
+[[patches]]
+[patches.pattern]
+target = "functions/UI_definitions.lua"
+pattern = """    contents.buttons = {
+      {n=G.UIT.C, config={align = "cm", r=0.1, colour = G.C.CLEAR, shadow = true, id = 'button_area', padding = 0.2}, nodes={"""
+position = "before"
+payload = """
+contents.opp_dollars_chips = getOpponentScoreUI()
+"""
+match_indent = true
+
+[[patches]]
+[patches.pattern]
+target = "functions/UI_definitions.lua"
+pattern = "contents.dollars_chips,"
+position = "after"
+payload = "contents.opp_dollars_chips,"
+match_indent = true

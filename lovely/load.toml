@@ -1,0 +1,14 @@
+[manifest]
+version = "1.0.0"
+
+[[patches]]
+[patches.copy]
+target = "main.lua"
+position = "append"
+sources = ["src/core.lua"]
+
+[[patches]]
+[patches.module]
+source = "lib/json.lua"
+before = "main.lua"
+name = "json"
