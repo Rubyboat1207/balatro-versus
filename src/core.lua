@@ -60,12 +60,16 @@ end
 
 function vsmod_round_ended(game_over)
     local sendChannel = love.thread.getChannel('tcp_send')
-    sendChannel:push(json.encode({type = "blind_cleared", data = json.encode({game_over = game_over})}))
+    sendChannel:push(json.encode({type = "update_score", data = json.encode({score = 0, blind = G.GAME.round + G.GAME.skips + 1})}))
+    sendChannel:push(json.encode({type = "blind_cleared", data = json.encode({blind=G.GAME.round + G.GAME.skips})}))
     VSMOD_GLOBALS.opponent_chips = VSMOD_GLOBALS.SCORES[G.GAME.round + G.GAME.skips + 1] or 0
     VSMOD_GLOBALS.started_remotely = nil
 end
 
 function vsmod_run_start()
+    if VSMOD_GLOBALS.started_remotely and G.STATE ~= 11 then
+        return
+    end
     VSMOD_GLOBALS.SCORES = {}
     local sendChannel = love.thread.getChannel('tcp_send')
     sendChannel:push(json.encode({type = "start_game", data = json.encode({seed = G.GAME.pseudorandom.seed, stake = G.GAME.stake})}))
@@ -86,6 +90,20 @@ function vsmod_update()
             local game_data = json.decode(decoded.data)
             G.FUNCS.start_run(nil, {stake = game_data.stake, seed = game_data.seed, challenge = nil})
             VSMOD_GLOBALS.SCORES = {}
+        elseif decoded.type == "declare_winner" then
+            local winning_data = json.decode(decoded.data)
+
+            if winning_data.won then
+                if winning_data.prize_type == 'gain_money' then
+                    local val = json.decode(winning_data.prize_value)
+
+                    ease_dollars(val, false)
+                end
+                print("You won blind " .. winning_data.blind)
+            else
+                print("You lost blind " .. winning_data.blind)
+            end
+
         end
     end
     local pr = love.thread.getChannel('tcp_printout'):pop()
@@ -96,7 +114,7 @@ function vsmod_update()
 end
 
 function initVersusMod()
-    VSMOD_GLOBALS.ip_address = ""
+    VSMOD_GLOBALS.ip_address = "localhost"
     VSMOD_GLOBALS.opponent_chips = 0
     VSMOD_GLOBALS.tcp_id = 0
 end

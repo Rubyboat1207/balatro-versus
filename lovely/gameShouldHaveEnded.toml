@@ -30,10 +30,10 @@ match_indent = true
 
 [[patches]]
 [patches.pattern]
-target = "functions/state_events.lua"
+target = "functions/button_callbacks.lua"
 pattern = """G:start_run(args)"""
 position = "after"
 payload = """
-vsmod_run_start
+vsmod_run_start()
 """
 match_indent = true
