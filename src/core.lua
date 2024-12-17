@@ -1,68 +1,104 @@
 local socket = require("socket")
 local json = require("json")
 
-VSMOD_GLOBALS = {}
+VSMOD_GLOBALS = {
+    SCORES = {}
+}
 VSMOD_GLOBALS.FUNCS = {}
 
 VSMOD_GLOBALS.FUNCS.vs_connect = function()
-        local ip = VSMOD_GLOBALS.ip_address
-        -- Pass the socket handling logic to the thread
-        tcp_recv = "local ip = ...\n function giveMeJSON()" .. json.literally_the_entire_library_as_a_string .. "\nend\n" .. [[
+    local ip = VSMOD_GLOBALS.ip_address
+    -- Pass the socket handling logic to the thread
+    tcp_recv = "local ip, id = ...\n function giveMeJSON()" .. json.literally_the_entire_library_as_a_string .. "\nend\n" .. [[
         local json = giveMeJSON()
         local socket = require("socket")
 
         if ip == "" then
             return
         end
-        local client = socket.tcp()
-        client:settimeout(1)
+        local tcp = socket.tcp()
+        tcp:settimeout(3)
+        local printoutChannel = love.thread.getChannel('tcp_printout')
 
-        local success, err = client:connect(ip, 5304)
+        local success, err = tcp:connect(ip, 5304)
         if not success then
-            print("Failed to connect to " .. ip .. ": " .. err)
+            printoutChannel:push("Failed to connect to " .. ip .. ": " .. err)
             return
         end
-        print("Connected to " .. ip)
-
+        tcp:settimeout(5)
         local sendChannel = love.thread.getChannel('tcp_send')
         local recvChannel = love.thread.getChannel('tcp_recv')
+        local signalChannel = love.thread.getChannel('tcp_signal')
+        printoutChannel:push("Connected to " .. ip)
 
         while true do
             -- Handle incoming messages
-            local data, msg = client:receive()
+            local data, status = tcp:receive("*l")
+            printoutChannel:push(data)
+            if status == "closed" then
+                return
+            end
             if data then
                 recvChannel:push(data)
             end
 
             -- Handle outgoing messages
-            if sendChannel:peek() then
-                local message = sendChannel:pop()
-                client:send(message)
+            msg = sendChannel:pop()
+            if msg then
+                printoutChannel:push('sending message')
+                tcp:send(msg)
             end
+
+            socket.sleep(0.01)
         end
     ]]
+    
+    love.thread.getChannel('tcp_signal'):push(VSMOD_GLOBALS.tcp_id)
+    love.thread.newThread(tcp_recv):start(ip, VSMOD_GLOBALS.tcp_id)
+    VSMOD_GLOBALS.tcp_id = VSMOD_GLOBALS.tcp_id + 1
+end
 
-    love.thread.newThread(tcp_recv):start(ip)
+function vsmod_round_ended(game_over)
+    local sendChannel = love.thread.getChannel('tcp_send')
+    sendChannel:push(json.encode({type = "blind_cleared", data = json.encode({game_over = game_over})}))
+    VSMOD_GLOBALS.opponent_chips = VSMOD_GLOBALS.SCORES[G.GAME.round + G.GAME.skips + 1] or 0
+    VSMOD_GLOBALS.started_remotely = nil
+end
+
+function vsmod_run_start()
+    VSMOD_GLOBALS.SCORES = {}
+    local sendChannel = love.thread.getChannel('tcp_send')
+    sendChannel:push(json.encode({type = "start_game", data = json.encode({seed = G.GAME.pseudorandom.seed, stake = G.GAME.stake})}))
 end
 
 function vsmod_update()
-    if VSMOD_GLOBALS.client then
-        -- Check for received data
-        if love.thread.getChannel('tcp_recv'):peek() then
-            local data = love.thread.getChannel('tcp_recv'):pop()
-            print("Got Data: " .. data)
-            local decoded = json.decode(data)
-            if decoded.type == "update_score" then
-                local score_data = json.decode(decoded.data)
-                VSMOD_GLOBALS.opponent_chips = score_data.score
-            end
+    -- Check for received data
+    local data = love.thread.getChannel('tcp_recv'):pop()
+    if data then
+        print("Got Data: " .. data)
+        local decoded = json.decode(data)
+        if decoded.type == "update_score" then
+            local score_data = json.decode(decoded.data)
+            VSMOD_GLOBALS.SCORES[score_data.blind] = score_data.score
+            VSMOD_GLOBALS.opponent_chips = VSMOD_GLOBALS.SCORES[G.GAME.round + G.GAME.skips] or 0
+        elseif decoded.type == "start_game" then
+            VSMOD_GLOBALS.started_remotely = true
+            local game_data = json.decode(decoded.data)
+            G.FUNCS.start_run(nil, {stake = game_data.stake, seed = game_data.seed, challenge = nil})
+            VSMOD_GLOBALS.SCORES = {}
         end
+    end
+    local pr = love.thread.getChannel('tcp_printout'):pop()
+
+    if pr then
+        print('THREADED: ' .. pr)
     end
 end
 
 function initVersusMod()
     VSMOD_GLOBALS.ip_address = ""
     VSMOD_GLOBALS.opponent_chips = 0
+    VSMOD_GLOBALS.tcp_id = 0
 end
 
 function makeMultiplayerTab()
@@ -80,10 +116,8 @@ function makeMultiplayerTab()
 end
 
 function onHandScored(hand_score)
-    if VSMOD_GLOBALS.client then
-        local sendChannel = love.thread.getChannel('tcp_send')
-        sendChannel:push(json.encode({type = "on_score", data = json.encode({score = G.GAME.chips + hand_score})}))
-    end
+    local sendChannel = love.thread.getChannel('tcp_send')
+    sendChannel:push(json.encode({type = "update_score", data = json.encode({score = G.GAME.chips + hand_score, blind = G.GAME.round + G.GAME.skips})}))
 end
 
 function getOpponentScoreUI()

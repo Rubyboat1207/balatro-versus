@@ -1,0 +1,39 @@
+[manifest]
+version = "1.0.0"
+
+[[patches]]
+[patches.pattern]
+target = "game.lua"
+pattern = """if G.GAME.chips - G.GAME.blind.chips >= 0 or G.GAME.current_round.hands_left < 1 then"""
+position = "at"
+payload = """
+if VSMOD_GLOBALS.round_cleared_at == nil and G.GAME.chips - G.GAME.blind.chips >= 0 then
+    VSMOD_GLOBALS.round_cleared_at = G.GAME.current_round.hands_left
+end
+if G.GAME.current_round.hands_left < 1 then
+    if G.GAME.chips - G.GAME.blind.chips >= 0 then
+        G.GAME.current_round.hands_left = VSMOD_GLOBALS.round_cleared_at
+        VSMOD_GLOBALS.round_cleared_at = nil
+    end
+"""
+match_indent = true
+
+[[patches]]
+[patches.pattern]
+target = "functions/state_events.lua"
+pattern = """if game_over then"""
+position = "before"
+payload = """
+vsmod_round_ended(game_over)
+"""
+match_indent = true
+
+[[patches]]
+[patches.pattern]
+target = "functions/state_events.lua"
+pattern = """G:start_run(args)"""
+position = "after"
+payload = """
+vsmod_run_start
+"""
+match_indent = true

@@ -3,10 +3,18 @@ version = "1.0.0"
 
 [[patches]]
 [patches.pattern]
-target = "functions/UI_definitions.lua"
+target = "functions/state_events.lua"
 pattern = """check_for_unlock({type = 'chip_score', chips = math.floor(hand_chips*mult)})"""
 position = "after"
 payload = """
-    onHandScored(hand_chips)
+    onHandScored(hand_chips*mult)
 """
+match_indent = false
+
+[[patches]]
+[patches.pattern]
+target = "functions/button_callbacks.lua"
+pattern = """G.FUNCS.start_setup_run = function(e)"""
+position = "after"
+payload = """"""
 match_indent = false
