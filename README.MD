@@ -28,7 +28,11 @@ This mod requires [lovely injector](https://github.com/ethangreen-dev/lovely-inj
 
 ### Installation Method 1 (Recommended)
 
-Install git or git for windows and navigate to the mods directory. (windows: `%AppData%/Balatro/Mods`, mac: `/Users/$USER/Library/Application Support/Balatro/Mods`) and enter the following in the command line
+1. Install git or git for windows
+
+2. navigate to the mods directory in the command line. (windows: `%AppData%/Balatro/Mods`, mac: `/Users/$USER/Library/Application Support/Balatro/Mods`) 
+
+3. enter the following in the command line
 
 ```
 git clone https://github.com/Rubyboat1207/balatro-versus.git
