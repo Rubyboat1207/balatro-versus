@@ -15,13 +15,16 @@ The balatro versus mod is a 2+ player experience (in early development) in which
   - Perishable Joker
   - Random Consumable Card
 
-### Proposed Changes
+### Planned Changes (In no particular order)
 
 - New multiplayer focused jokers & Consumables
-- Notifications to show winners
+- Notifications to show winners/losers
 - Extra UI features
+- A P2P mode
+- Server UI
+- Centralized servers with lobbies (instead of/in addition to dedicated servers)
 
-## Usage
+## Installation
 
 This mod requires [lovely injector](https://github.com/ethangreen-dev/lovely-injector), as of writing, it is installed by downloading the latest release or artifact from actions and placing version.dll next to the exe.
 
@@ -50,3 +53,7 @@ git pull
 
 > [!WARNING]
 > The Folder must be named "balatro-versus" (case sensitive)
+
+## Usage
+
+This mod uses a client-server architecture, so to play with your friends, you'll need to run your own dedicated server. Get the latest artifact at [this repo](https://github.com/Rubyboat1207/balatro-vs-server)

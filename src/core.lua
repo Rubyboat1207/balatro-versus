@@ -86,10 +86,6 @@ function vsmod_round_ended(game_over)
 end
 
 function vsmod_run_start()
-    if VSMOD_GLOBALS.started_remotely then
-        print('returned early')
-        return
-    end
     VSMOD_GLOBALS.SCORES = {}
     local sendChannel = love.thread.getChannel('tcp_send')
     sendChannel:push(json.encode({ type = "start_game", data = json.encode({ seed = G.GAME.pseudorandom.seed, stake = G
@@ -107,7 +103,6 @@ function vsmod_update()
             VSMOD_GLOBALS.SCORES[score_data.blind] = score_data.score
             VSMOD_GLOBALS.opponent_chips = VSMOD_GLOBALS.SCORES[G.GAME.round + G.GAME.skips] or 0
         elseif decoded.type == "start_game" then
-            VSMOD_GLOBALS.started_remotely = true
             local game_data = json.decode(decoded.data)
             G.FUNCS.start_run(nil, { stake = game_data.stake, seed = game_data.seed, challenge = nil })
             VSMOD_GLOBALS.SCORES = {}
