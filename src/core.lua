@@ -89,7 +89,7 @@ function vsmod_run_start()
     VSMOD_GLOBALS.SCORES = {}
     local sendChannel = love.thread.getChannel('tcp_send')
     sendChannel:push(json.encode({ type = "start_game", data = json.encode({ seed = G.GAME.pseudorandom.seed, stake = G
-    .GAME.stake }) }))
+    .GAME.stake, deck = G.GAME.selected_back.name }) }))
 end
 
 function vsmod_update()
@@ -104,7 +104,9 @@ function vsmod_update()
             VSMOD_GLOBALS.opponent_chips = VSMOD_GLOBALS.SCORES[G.GAME.round + G.GAME.skips] or 0
         elseif decoded.type == "start_game" then
             local game_data = json.decode(decoded.data)
+            G.GAME.selected_back = get_deck_from_name(game_data.deck)
             G.FUNCS.start_run(nil, { stake = game_data.stake, seed = game_data.seed, challenge = nil })
+            G.GAME.seeded = false
             VSMOD_GLOBALS.SCORES = {}
         elseif decoded.type == "declare_winner" then
             local winning_data = json.decode(decoded.data)
