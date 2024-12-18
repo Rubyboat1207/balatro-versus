@@ -7,14 +7,7 @@ target = "game.lua"
 pattern = """if G.GAME.chips - G.GAME.blind.chips >= 0 or G.GAME.current_round.hands_left < 1 then"""
 position = "at"
 payload = """
-if VSMOD_GLOBALS.round_cleared_at == nil and G.GAME.chips - G.GAME.blind.chips >= 0 then
-    VSMOD_GLOBALS.round_cleared_at = G.GAME.current_round.hands_left
-end
-if G.GAME.current_round.hands_left < 1 then
-    if G.GAME.chips - G.GAME.blind.chips >= 0 then
-        G.GAME.current_round.hands_left = VSMOD_GLOBALS.round_cleared_at
-        VSMOD_GLOBALS.round_cleared_at = nil
-    end
+if vsmod_should_end_round() then
 """
 match_indent = true
 
