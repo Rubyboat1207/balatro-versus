@@ -12,3 +12,9 @@ sources = ["src/core.lua"]
 source = "lib/json.lua"
 before = "main.lua"
 name = "json"
+
+[[patches]]
+[patches.module]
+source = "lib/nativefs/nativefs.lua"
+before = "main.lua"
+name = "nativefs"

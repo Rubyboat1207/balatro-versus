@@ -1,5 +1,7 @@
-local socket = require("socket")
-local json = require("json")
+local socket = require "socket"
+local json = require "json"
+local nativefs = require "nativefs"
+local lovely = require "lovely"
 
 VSMOD_GLOBALS = {
     SCORES = {},
@@ -184,8 +186,25 @@ function vsmod_should_end_round()
     return false
 end
 
-function vsmod_loadAssets() 
-    table.insert(G.GAME.asset_images, {name = "versus", path = "assets/versus-ingame.png",px=835,py=348})
+
+function vsmod_loadAssets(game)
+    local vsmod_dir = lovely.mod_dir:gsub("/$", "")
+    nativefs.setWorkingDirectory(vsmod_dir .. '/versus-mod')
+    print(json.encode(nativefs.getDirectoryItems("resources/1x")))
+
+    local logo_data = nativefs.newFileData("resources/1x/versus-ingame.png")
+    if logo_data == nil then
+        print("Failed to load versus logo")
+        return
+    end
+    
+    G.ASSET_ATLAS["versus"] = {
+        name = "versus",
+        image = love.graphics.newImage(love.image.newImageData(logo_data),
+        { mipmaps = true, dpiscale = G.SETTINGS.GRAPHICS.texture_scaling}),
+        px = 835,
+        py = 348
+    }
 end
 
 function initVersusMod()
