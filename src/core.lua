@@ -113,6 +113,10 @@ function vsmod_update()
     end
 end
 
+function vsmod_loadAssets() 
+    table.insert(G.GAME.asset_images, {name = "versus", path = "assets/versus-ingame.png",px=835,py=348})
+end
+
 function initVersusMod()
     VSMOD_GLOBALS.ip_address = "localhost"
     VSMOD_GLOBALS.opponent_chips = 0

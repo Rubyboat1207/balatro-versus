@@ -1,0 +1,23 @@
+[manifest]
+version = "1.0.0"
+
+[[patches]]
+[patches.pattern]
+target = "game.lua"
+pattern = """G.SPLASH_LOGO.dissolve = 1"""
+position = "after"
+payload = """
+
+"""
+match_indent = true
+
+[[patches]]
+[patches.pattern]
+target = "game.lua"
+pattern = """{name = "localthunk_logo", path = "resources/textures/1x/localthunk-logo.png", px=1390,py=560}
+    }"""
+position = "after"
+payload = """
+vsmod_loadAssets()
+"""
+match_indent = true
