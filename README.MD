@@ -59,5 +59,10 @@ git pull
 > The Folder must be named "balatro-versus" (case sensitive)
 
 ## Usage
+> [!NOTE]
+> This mod uses a client-server architecture, so to play with your friends, you'll need to run your own dedicated server. Get the latest artifact at [this repo](https://github.com/Rubyboat1207/balatro-vs-server)
 
-This mod uses a client-server architecture, so to play with your friends, you'll need to run your own dedicated server. Get the latest artifact at [this repo](https://github.com/Rubyboat1207/balatro-vs-server)
+1. Download and run the server
+2. Port forward the server's port `5304`
+3. In balatro, both you and your friend(s) should go to your settings and open the `Multiplayer` tab and put in the IP of the server
+4. Assuming the IP is correct, once any of you start a run, it should start a run with the same seed on all other players
