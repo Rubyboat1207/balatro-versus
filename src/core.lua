@@ -35,7 +35,7 @@ VSMOD_GLOBALS.FUNCS.vs_connect = function()
             printoutChannel:push("Failed to connect to " .. ip .. ": " .. err)
             return
         end
-        tcp:settimeout(5)
+        tcp:settimeout(0)
         local sendChannel = love.thread.getChannel('tcp_send')
         local recvChannel = love.thread.getChannel('tcp_recv')
         local signalChannel = love.thread.getChannel('tcp_signal')
@@ -209,7 +209,7 @@ function vsmod_loadAssets(game)
 end
 
 function initVersusMod()
-    VSMOD_GLOBALS.ip_address = "localhost"
+    VSMOD_GLOBALS.ip_address = ""
     VSMOD_GLOBALS.opponent_chips = 0
     VSMOD_GLOBALS.tcp_id = 0
     VSMOD_GLOBALS.normal_mode = true
