@@ -55,7 +55,7 @@ VSMOD_GLOBALS.FUNCS.vs_connect = function()
             -- Handle outgoing messages
             msg = sendChannel:pop()
             if msg then
-                printoutChannel:push('sending message')
+                printoutChannel:push('sending message ' .. msg)
                 tcp:send(msg)
             end
 
@@ -86,7 +86,8 @@ function vsmod_round_ended(game_over)
 end
 
 function vsmod_run_start()
-    if VSMOD_GLOBALS.started_remotely or G.STATE ~= 11 then
+    if VSMOD_GLOBALS.started_remotely then
+        print('returned early')
         return
     end
     VSMOD_GLOBALS.SCORES = {}
