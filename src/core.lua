@@ -189,7 +189,7 @@ end
 
 function vsmod_loadAssets(game)
     local vsmod_dir = lovely.mod_dir:gsub("/$", "")
-    nativefs.setWorkingDirectory(vsmod_dir .. '/versus-mod')
+    nativefs.setWorkingDirectory(vsmod_dir .. '/balatro-versus')
     print(json.encode(nativefs.getDirectoryItems("resources/1x")))
 
     local logo_data = nativefs.newFileData("resources/1x/versus-ingame.png")
