@@ -48,13 +48,14 @@ local function connect()
                 break
             end
             if data then
+                printoutChannel:push('recieved message ' .. data:gsub('%"', "'"))
                 recvChannel:push(data)
             end
 
             -- Handle outgoing messages
             msg = sendChannel:pop()
             if msg then
-                printoutChannel:push('sending message ' .. msg)
+                printoutChannel:push('sending message ' .. msg:gsub('%"', "'"))
                 tcp:send(msg)
             end
 
@@ -131,12 +132,16 @@ function vsmod_run_start()
 end
 
 function vsmod_update()
+    local pr = love.thread.getChannel('tcp_printout'):pop()
+
+    if pr then
+        print('THREADED: ' .. pr)
+    end
     -- Check for received data
     monitor_connection()
 
     local data = love.thread.getChannel('tcp_recv'):pop()
     if data then
-        print("Got Data: " .. data)
         local decoded = json.decode(data)
         if decoded.type == "update_score" then
             local score_data = json.decode(decoded.data)
@@ -162,7 +167,7 @@ function vsmod_update()
                         G.GAME.joker_buffer = G.GAME.joker_buffer + 1
                         G.E_MANAGER:add_event(Event({
                             func = function()
-                                local card = create_card('Joker', G.jokers, nil, val.rarity, nil, nil, nil, 'pri')
+                                local card = create_card('Joker', G.jokers, nil, val, nil, nil, nil, 'pri')
                                 card:set_perishable(true)
                                 card:set_edition({ negative = true }, true)
                                 card:add_to_deck()
@@ -178,7 +183,7 @@ function vsmod_update()
                             G.GAME.consumeable_buffer = G.GAME.consumeable_buffer + 1
                             G.E_MANAGER:add_event(Event({
                                 func = function()
-                                    local card = create_card(val.type, G.consumeables, nil, nil, nil, nil, nil, 'pri')
+                                    local card = create_card(val, G.consumeables, nil, nil, nil, nil, nil, 'pri')
                                     card:add_to_deck()
                                     G.consumeables:emplace(card)
                                     G.GAME.consumeable_buffer = G.GAME.consumeable_buffer - 1
@@ -199,11 +204,7 @@ function vsmod_update()
             VSMOD_GLOBALS.last_on_blind[json.decode(decoded.data)] = true
         end
     end
-    local pr = love.thread.getChannel('tcp_printout'):pop()
-
-    if pr then
-        print('THREADED: ' .. pr)
-    end
+    
 end
 
 function vsmod_should_end_round()
