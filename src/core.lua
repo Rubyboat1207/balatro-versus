@@ -183,6 +183,7 @@ end
 
 function vsmod_update()
     local pr = love.thread.getChannel('tcp_printout'):pop()
+    print(G.STATE)
 
     if pr then
         print('THREADED: ' .. pr)
@@ -190,7 +191,7 @@ function vsmod_update()
     -- Check for received data
     monitor_connection()
 
-    if G.STATE <= 3 then
+    if G.STATE >= 3 then
         VSMOD_GLOBALS.opponent_chips = 0
     else
         VSMOD_GLOBALS.opponent_chips = VSMOD_GLOBALS.SCORES[G.GAME.round + G.GAME.skips] or 0
