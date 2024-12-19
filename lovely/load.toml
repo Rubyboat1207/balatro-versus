@@ -1,5 +1,6 @@
 [manifest]
 version = "1.0.0"
+priority = 1
 
 [[patches]]
 [patches.copy]
