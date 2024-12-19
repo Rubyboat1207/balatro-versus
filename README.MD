@@ -66,3 +66,6 @@ git pull
 2. Port forward the server's port `5304`
 3. In balatro, both you and your friend(s) should go to your settings and open the `Multiplayer` tab and put in the IP of the server
 4. Assuming the IP is correct, once any of you start a run, it should start a run with the same seed on all other players
+
+> [!TIP]
+> You can contact me at @rubyboat on discord if you have any questions!
