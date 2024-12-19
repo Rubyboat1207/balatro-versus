@@ -45,6 +45,7 @@ local function connect()
             -- Handle incoming messages
             local data, status = tcp:receive("*l")
             printoutChannel:push(data)
+            printoutChannel:push(status)
             if status == "closed" then
                 break
             end
@@ -82,7 +83,7 @@ local function monitor_connection()
     local latest_signal = signal:peek()
     local cs = VSMOD_GLOBALS.connection_state
 
-    if latest_signal == "disconnected" and cs.awaiting_connect then
+    if latest_signal == "disconnected" then
         print('old connection successfully disconnected, making new connection')
         signal:pop()
         cs.connected = false
@@ -96,7 +97,7 @@ local function monitor_connection()
     end
 end
 
-VSMOD_GLOBALS.FUNCS.vs_connect = function()
+function VSMOD_GLOBALS.FUNCS.vs_connect()
     VSMOD_GLOBALS.normal_mode = false
     love.thread.getChannel('tcp_recv'):clear()
     love.thread.getChannel('tcp_send'):clear()
@@ -111,6 +112,18 @@ VSMOD_GLOBALS.FUNCS.vs_connect = function()
         VSMOD_GLOBALS.connection_state.awaiting_disconnect = true
         signal:push('disconnect')
     end
+end
+
+function VSMOD_GLOBALS.FUNCS.vs_joinlobby()
+    if VSMOD_GLOBALS.lobby_id == "" then
+        return
+    end
+    love.thread.getChannel('tcp_send'):push(json.encode({
+        type = "join_lobby",
+        data = json.encode({
+            lobby_id = VSMOD_GLOBALS.lobby_id
+        })
+    }))
 end
 
 function vsmod_round_ended(game_over)
@@ -148,7 +161,7 @@ function vsmod_run_start()
     }))
 end
 
-function VSMOD_GLOBALS.REWARDS.random_joker(data) 
+function VSMOD_GLOBALS.REWARDS.random_joker(data)
     G.GAME.joker_buffer = G.GAME.joker_buffer + 1
     G.E_MANAGER:add_event(Event({
         func = function()
@@ -271,25 +284,50 @@ end
 
 function initVersusMod()
     VSMOD_GLOBALS.ip_address = ""
+    VSMOD_GLOBALS.lobby_id = ""
     VSMOD_GLOBALS.opponent_chips = 0
     VSMOD_GLOBALS.normal_mode = true
 end
 
 function makeMultiplayerTab()
+    local ptext = "Versus Opponent IP"
+    local ref_val = "ip_address"
+    local label_txt = "Connect To Server"
+    local fn = "vs_connect"
+
+    if VSMOD_GLOBALS.connection_state.connected then
+        ptext = "Lobby Id"
+        ref_val = "lobby_id"
+        label_txt = "Join Lobby"
+        fn = "vs_joinlobby"
+    end
     return {
         n = G.UIT.ROOT,
         config = { align = "cm", padding = 0.05, colour = G.C.CLEAR },
         nodes = {
-            create_text_input({
-                max_length = 15,
-                extended_corpus = true,
-                all_caps = false,
-                ref_table = VSMOD_GLOBALS,
-                ref_value = 'ip_address',
-                prompt_text = "Versus Opponent IP",
-            }),
-            UIBox_button { button = "vs_connect", colour = G.C.BLUE, minw = 2.65, minh = 1.35, label = { "Connect" }, scale = 2.4, col = true } or
-            nil
+            {
+                n = G.UIT.C,
+                config = { align = "tm", colour = G.C.CLEAR },
+                nodes = {
+                    {
+                        n = G.UIT.R,
+                        config = { align = "cm" },
+                        id = 'ip',
+                        nodes = {
+                            create_text_input({
+                                max_length = 15,
+                                extended_corpus = true,
+                                all_caps = false,
+                                ref_table = VSMOD_GLOBALS,
+                                ref_value = ref_val,
+                                prompt_text = ptext,
+                            }),
+                            UIBox_button { button = fn, colour = G.C.BLUE, minw = 2.65, minh = 1.35, label = { label_txt }, scale = 1.2, col = true } or
+                            nil,
+                        }
+                    }
+                }
+            }
         }
     }
 end
