@@ -426,3 +426,6 @@ function getOpponentScoreUI()
         }
     }
 end
+
+
+initVersusMod()
