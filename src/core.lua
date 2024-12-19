@@ -6,24 +6,23 @@ local lovely = require "lovely"
 VSMOD_GLOBALS = {
     SCORES = {},
     VERSUS = false,
-    last_on_blind = {}
+    last_on_blind = {},
+    connection_state = {
+        connected = false,
+        awaiting_connect = false
+    },
 }
 VSMOD_GLOBALS.FUNCS = {}
 
-VSMOD_GLOBALS.FUNCS.vs_connect = function()
-    local ip = VSMOD_GLOBALS.ip_address
-    VSMOD_GLOBALS.normal_mode = false
-    love.thread.getChannel('tcp_recv'):clear()
-    love.thread.getChannel('tcp_send'):clear()
-    love.thread.getChannel('tcp_signal'):clear()
-
-    -- Pass the socket handling logic to the thread
-    tcp_recv = "local ip, id = ...\n function giveMeJSON()" ..
+local function connect()
+    tcp_recv = "local ip= ...\n function giveMeJSON()" ..
     json.literally_the_entire_library_as_a_string .. "\nend\n" .. [[
         local json = giveMeJSON()
         local socket = require("socket")
+        local signalChannel = love.thread.getChannel('tcp_signal')
 
         if ip == "" then
+            signalChannel:push("disconnected")
             return
         end
         local tcp = socket.tcp()
@@ -33,12 +32,12 @@ VSMOD_GLOBALS.FUNCS.vs_connect = function()
         local success, err = tcp:connect(ip, 5304)
         if not success then
             printoutChannel:push("Failed to connect to " .. ip .. ": " .. err)
+            signalChannel:push("disconnected")
             return
         end
         tcp:settimeout(0)
         local sendChannel = love.thread.getChannel('tcp_send')
         local recvChannel = love.thread.getChannel('tcp_recv')
-        local signalChannel = love.thread.getChannel('tcp_signal')
         printoutChannel:push("Connected to " .. ip)
 
         while true do
@@ -46,7 +45,7 @@ VSMOD_GLOBALS.FUNCS.vs_connect = function()
             local data, status = tcp:receive("*l")
             printoutChannel:push(data)
             if status == "closed" then
-                return
+                break
             end
             if data then
                 recvChannel:push(data)
@@ -59,20 +58,59 @@ VSMOD_GLOBALS.FUNCS.vs_connect = function()
                 tcp:send(msg)
             end
 
-            local signal = signalChannel:pop()
+            local signal = signalChannel:peek()
 
             if signal == "disconnect" then
+                signalChannel:pop()
                 tcp:close()
-                return
+                break
             end
 
             socket.sleep(0.01)
         end
+        signalChannel:push("disconnected")
     ]]
 
-    love.thread.getChannel('tcp_signal'):push(VSMOD_GLOBALS.tcp_id)
-    love.thread.newThread(tcp_recv):start(ip, VSMOD_GLOBALS.tcp_id)
-    VSMOD_GLOBALS.tcp_id = VSMOD_GLOBALS.tcp_id + 1
+    love.thread.newThread(tcp_recv):start(VSMOD_GLOBALS.ip_address)
+end
+
+local function monitor_connection()
+    local signal = love.thread.getChannel('tcp_signal')
+
+    local latest_signal = signal:peek()
+    local cs = VSMOD_GLOBALS.connection_state
+
+    if latest_signal == "disconnected" and cs.awaiting_connect then
+        print('old connection successfully disconnected, making new connection')
+        signal:pop()
+        cs.connected = false
+    end
+
+    if cs.awaiting_connect and cs.connected == false then
+        print("No connection exists, creating new one!")
+        cs.awaiting_connect = false
+        cs.connected = true
+        connect()
+    end
+
+    
+end
+
+VSMOD_GLOBALS.FUNCS.vs_connect = function()
+    VSMOD_GLOBALS.normal_mode = false
+    love.thread.getChannel('tcp_recv'):clear()
+    love.thread.getChannel('tcp_send'):clear()
+    local signal = love.thread.getChannel('tcp_signal')
+    signal:clear()
+
+    print("attempting connection.")
+    VSMOD_GLOBALS.connection_state.awaiting_connect = true
+
+    if VSMOD_GLOBALS.connection_state.connected then
+        print("old connection exists, pushing disconnect signal")
+        VSMOD_GLOBALS.connection_state.awaiting_disconnect = true
+        signal:push('disconnect')
+    end
 end
 
 function vsmod_round_ended(game_over)
@@ -94,6 +132,8 @@ end
 
 function vsmod_update()
     -- Check for received data
+    monitor_connection()
+
     local data = love.thread.getChannel('tcp_recv'):pop()
     if data then
         print("Got Data: " .. data)
@@ -208,7 +248,6 @@ end
 function initVersusMod()
     VSMOD_GLOBALS.ip_address = ""
     VSMOD_GLOBALS.opponent_chips = 0
-    VSMOD_GLOBALS.tcp_id = 0
     VSMOD_GLOBALS.normal_mode = true
 end
 
