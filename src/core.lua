@@ -11,12 +11,13 @@ VSMOD_GLOBALS = {
         connected = false,
         awaiting_connect = false
     },
+    REWARDS = {}
 }
 VSMOD_GLOBALS.FUNCS = {}
 
 local function connect()
     tcp_recv = "local ip= ...\n function giveMeJSON()" ..
-    json.literally_the_entire_library_as_a_string .. "\nend\n" .. [[
+        json.literally_the_entire_library_as_a_string .. "\nend\n" .. [[
         local json = giveMeJSON()
         local socket = require("socket")
         local signalChannel = love.thread.getChannel('tcp_signal')
@@ -93,8 +94,6 @@ local function monitor_connection()
         cs.connected = true
         connect()
     end
-
-    
 end
 
 VSMOD_GLOBALS.FUNCS.vs_connect = function()
@@ -116,19 +115,70 @@ end
 
 function vsmod_round_ended(game_over)
     local sendChannel = love.thread.getChannel('tcp_send')
-    sendChannel:push(json.encode({ type = "update_score", data = json.encode({ score = 0, blind = G.GAME.round +
-    G.GAME.skips + 1 }) }))
-    sendChannel:push(json.encode({ type = "blind_cleared", data = json.encode({ blind = G.GAME.round + G.GAME.skips, game_over =
-    game_over }) }))
-    VSMOD_GLOBALS.opponent_chips = VSMOD_GLOBALS.SCORES[G.GAME.round + G.GAME.skips + 1] or 0
+    sendChannel:push(json.encode({
+        type = "update_score",
+        data = json.encode({
+            score = 0,
+            blind = G.GAME.round +
+                G.GAME.skips + 1
+        })
+    }))
+    sendChannel:push(json.encode({
+        type = "blind_cleared",
+        data = json.encode({
+            blind = G.GAME.round + G.GAME.skips,
+            game_over =
+                game_over
+        })
+    }))
     VSMOD_GLOBALS.started_remotely = nil
 end
 
 function vsmod_run_start()
     VSMOD_GLOBALS.SCORES = {}
     local sendChannel = love.thread.getChannel('tcp_send')
-    sendChannel:push(json.encode({ type = "start_game", data = json.encode({ seed = G.GAME.pseudorandom.seed, stake = G
-    .GAME.stake, deck = G.GAME.selected_back.name }) }))
+    sendChannel:push(json.encode({
+        type = "start_game",
+        data = json.encode({
+            seed = G.GAME.pseudorandom.seed,
+            stake = G
+                .GAME.stake,
+            deck = G.GAME.selected_back.name
+        })
+    }))
+end
+
+function VSMOD_GLOBALS.REWARDS.random_joker(data) 
+    G.GAME.joker_buffer = G.GAME.joker_buffer + 1
+    G.E_MANAGER:add_event(Event({
+        func = function()
+            local card = create_card('Joker', G.jokers, nil, data, nil, nil, nil, 'pri')
+            card:set_perishable(true)
+            card:set_edition({ negative = true }, true)
+            card:add_to_deck()
+            G.jokers:emplace(card)
+            card:start_materialize()
+            G.GAME.joker_buffer = G.GAME.joker_buffer - 1
+            return true
+        end
+    }))
+end
+
+function VSMOD_GLOBALS.REWARDS.random_consumable(data)
+    G.GAME.consumeable_buffer = G.GAME.consumeable_buffer + 1
+    G.E_MANAGER:add_event(Event({
+        func = function()
+            local card = create_card(data, G.consumeables, nil, nil, nil, nil, nil, 'pri')
+            card:add_to_deck()
+            G.consumeables:emplace(card)
+            G.GAME.consumeable_buffer = G.GAME.consumeable_buffer - 1
+            return true
+        end
+    }))
+end
+
+function VSMOD_GLOBALS.REWARDS.gain_money(data)
+    ease_dollars(data, false)
 end
 
 function vsmod_update()
@@ -140,75 +190,49 @@ function vsmod_update()
     -- Check for received data
     monitor_connection()
 
+    if G.STATE <= 3 then
+        VSMOD_GLOBALS.opponent_chips = 0
+    else
+        VSMOD_GLOBALS.opponent_chips = VSMOD_GLOBALS.SCORES[G.GAME.round + G.GAME.skips] or 0
+    end
+
     local data = love.thread.getChannel('tcp_recv'):pop()
     if data then
         local decoded = json.decode(data)
         if decoded.type == "update_score" then
             local score_data = json.decode(decoded.data)
             VSMOD_GLOBALS.SCORES[score_data.blind] = score_data.score
-            VSMOD_GLOBALS.opponent_chips = VSMOD_GLOBALS.SCORES[G.GAME.round + G.GAME.skips] or 0
         elseif decoded.type == "start_game" then
             local game_data = json.decode(decoded.data)
-            G.GAME.selected_back = get_deck_from_name(game_data.deck)
+            G.GAME.viewed_back = get_deck_from_name(game_data.deck)
+            G.GAME.selected_back = G.GAME.viewed_back
             G.FUNCS.start_run(nil, { stake = game_data.stake, seed = game_data.seed, challenge = nil })
             G.GAME.seeded = false
             VSMOD_GLOBALS.SCORES = {}
         elseif decoded.type == "declare_winner" then
             local winning_data = json.decode(decoded.data)
-
             if winning_data.won then
-                if winning_data.prize_type == 'gain_money' then
-                    local val = json.decode(winning_data.prize_value)
-
-                    ease_dollars(val, false)
-                else
-                    if winning_data.prize_type == "random_joker" then
-                        local val = json.decode(winning_data.prize_value)
-                        G.GAME.joker_buffer = G.GAME.joker_buffer + 1
-                        G.E_MANAGER:add_event(Event({
-                            func = function()
-                                local card = create_card('Joker', G.jokers, nil, val, nil, nil, nil, 'pri')
-                                card:set_perishable(true)
-                                card:set_edition({ negative = true }, true)
-                                card:add_to_deck()
-                                G.jokers:emplace(card)
-                                card:start_materialize()
-                                G.GAME.joker_buffer = G.GAME.joker_buffer - 1
-                                return true
-                            end
-                        }))
-                    else
-                        if winning_data.prize_type == "random_consumable" then
-                            local val = json.decode(winning_data.prize_value)
-                            G.GAME.consumeable_buffer = G.GAME.consumeable_buffer + 1
-                            G.E_MANAGER:add_event(Event({
-                                func = function()
-                                    local card = create_card(val, G.consumeables, nil, nil, nil, nil, nil, 'pri')
-                                    card:add_to_deck()
-                                    G.consumeables:emplace(card)
-                                    G.GAME.consumeable_buffer = G.GAME.consumeable_buffer - 1
-                                    return true
-                                end
-                            }))
-                        end
-                    end
-                end
+                VSMOD_GLOBALS.REWARDS[winning_data.prize_type](json.decode(winning_data.prize_value))
                 print("You won blind " .. winning_data.blind)
             else
                 print("You lost blind " .. winning_data.blind)
             end
         elseif decoded.type == "game_normal" then
-            VSMOD_GLOBALS.normal_mode = true
             love.thread.getChannel('tcp_signal'):push('disconnect')
         elseif decoded.type == "last_on_blind" then
             VSMOD_GLOBALS.last_on_blind[json.decode(decoded.data)] = true
         end
     end
-    
 end
 
 function vsmod_should_end_round()
-    if VSMOD_GLOBALS.normal_mode or VSMOD_GLOBALS.last_on_blind[G.GAME.round + G.GAME.skips] then
+    if
+        not VSMOD_GLOBALS.connection_state.connected or
+        (
+            VSMOD_GLOBALS.last_on_blind["" .. G.GAME.round + G.GAME.skips] and
+            G.GAME.chips > VSMOD_GLOBALS.SCORES[G.GAME.round + G.GAME.skips]
+        )
+    then
         return G.GAME.chips - G.GAME.blind.chips >= 0 or G.GAME.current_round.hands_left < 1
     end
 
@@ -219,12 +243,11 @@ function vsmod_should_end_round()
         if G.GAME.chips - G.GAME.blind.chips >= 0 then
             G.GAME.current_round.hands_left = VSMOD_GLOBALS.round_cleared_at
             VSMOD_GLOBALS.round_cleared_at = nil
-            return true
         end
+        return true
     end
     return false
 end
-
 
 function vsmod_loadAssets(game)
     local vsmod_dir = lovely.mod_dir:gsub("/$", "")
@@ -236,11 +259,11 @@ function vsmod_loadAssets(game)
         print("Failed to load versus logo")
         return
     end
-    
+
     G.ASSET_ATLAS["versus"] = {
         name = "versus",
         image = love.graphics.newImage(love.image.newImageData(logo_data),
-        { mipmaps = true, dpiscale = G.SETTINGS.GRAPHICS.texture_scaling}),
+            { mipmaps = true, dpiscale = G.SETTINGS.GRAPHICS.texture_scaling }),
         px = 835,
         py = 348
     }
@@ -273,8 +296,14 @@ end
 
 function onHandScored(hand_score)
     local sendChannel = love.thread.getChannel('tcp_send')
-    sendChannel:push(json.encode({ type = "update_score", data = json.encode({ score = G.GAME.chips + hand_score, blind =
-    G.GAME.round + G.GAME.skips }) }))
+    sendChannel:push(json.encode({
+        type = "update_score",
+        data = json.encode({
+            score = G.GAME.chips + hand_score,
+            blind =
+                G.GAME.round + G.GAME.skips
+        })
+    }))
 end
 
 function getOpponentScoreUI()
