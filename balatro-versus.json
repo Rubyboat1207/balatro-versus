@@ -1,0 +1,12 @@
+{
+    "id": "balatro_versus",
+    "name": "Balatro Versus",
+    "author": ["Rubyboat"],
+    "description": "A versus mode for Balatro.",
+    "prefix": "versus",
+    "main_file": "src/core.lua",
+    "dependencies": [
+        "Steamodded (*)",
+        "Balatro (>=1.0)"
+    ]
+}
