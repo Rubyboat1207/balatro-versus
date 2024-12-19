@@ -183,7 +183,6 @@ end
 
 function vsmod_update()
     local pr = love.thread.getChannel('tcp_printout'):pop()
-    print(G.STATE)
 
     if pr then
         print('THREADED: ' .. pr)
