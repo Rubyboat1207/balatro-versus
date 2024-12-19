@@ -203,6 +203,7 @@ end
 
 function vsmod_update()
     local pr = love.thread.getChannel('tcp_printout'):pop()
+    print(G.STATE)
 
     if pr then
         print('THREADED: ' .. pr)
@@ -210,7 +211,7 @@ function vsmod_update()
     -- Check for received data
     monitor_connection()
 
-    if G.STATE <= 3 then
+    if G.STATE >= 3 then
         VSMOD_GLOBALS.opponent_chips = 0
     else
         VSMOD_GLOBALS.opponent_chips = VSMOD_GLOBALS.SCORES[G.GAME.round + G.GAME.skips] or 0
@@ -221,7 +222,9 @@ function vsmod_update()
         local decoded = json.decode(data)
         if decoded.type == "update_score" then
             local score_data = json.decode(decoded.data)
-            VSMOD_GLOBALS.SCORES[score_data.blind] = score_data.score
+            if score_data.score > (VSMOD_GLOBALS.SCORES[score_data.blind] or 0) then
+                VSMOD_GLOBALS.SCORES[score_data.blind] = score_data.score
+            end
         elseif decoded.type == "start_game" then
             local game_data = json.decode(decoded.data)
             G.GAME.viewed_back = get_deck_from_name(game_data.deck)
