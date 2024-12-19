@@ -202,7 +202,9 @@ function vsmod_update()
         local decoded = json.decode(data)
         if decoded.type == "update_score" then
             local score_data = json.decode(decoded.data)
-            VSMOD_GLOBALS.SCORES[score_data.blind] = score_data.score
+            if score_data.score > (VSMOD_GLOBALS.SCORES[score_data.blind] or 0) then
+                VSMOD_GLOBALS.SCORES[score_data.blind] = score_data.score
+            end
         elseif decoded.type == "start_game" then
             local game_data = json.decode(decoded.data)
             G.GAME.viewed_back = get_deck_from_name(game_data.deck)
