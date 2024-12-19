@@ -16,6 +16,10 @@ VSMOD_GLOBALS = {
 VSMOD_GLOBALS.FUNCS = {}
 
 local function connect()
+    if nativefs.read("vsmod_config.json") == nil then
+        nativefs.write("vsmod_config.json", json.encode({ ip_address = VSMOD_GLOBALS.ip_address }))
+    end
+
     tcp_recv = "local ip= ...\n function giveMeJSON()" ..
         json.literally_the_entire_library_as_a_string .. "\nend\n" .. [[
         local json = giveMeJSON()
@@ -44,8 +48,9 @@ local function connect()
         while true do
             -- Handle incoming messages
             local data, status = tcp:receive("*l")
-            printoutChannel:push(data)
-            printoutChannel:push(status)
+            if data then
+                printoutChannel:push(data)
+            end
             if status == "closed" then
                 break
             end
@@ -112,12 +117,14 @@ function VSMOD_GLOBALS.FUNCS.vs_connect()
         VSMOD_GLOBALS.connection_state.awaiting_disconnect = true
         signal:push('disconnect')
     end
+
 end
 
 function VSMOD_GLOBALS.FUNCS.vs_joinlobby()
     if VSMOD_GLOBALS.lobby_id == "" then
         return
     end
+    print('attempting to join lobby')
     love.thread.getChannel('tcp_send'):push(json.encode({
         type = "join_lobby",
         data = json.encode({
@@ -263,9 +270,9 @@ function vsmod_should_end_round()
 end
 
 function vsmod_loadAssets(game)
+    local normal_dir = nativefs.getWorkingDirectory()
     local vsmod_dir = lovely.mod_dir:gsub("/$", "")
     nativefs.setWorkingDirectory(vsmod_dir .. '/balatro-versus')
-    print(json.encode(nativefs.getDirectoryItems("resources/1x")))
 
     local logo_data = nativefs.newFileData("resources/1x/versus-ingame.png")
     if logo_data == nil then
@@ -280,6 +287,8 @@ function vsmod_loadAssets(game)
         px = 835,
         py = 348
     }
+
+    nativefs.setWorkingDirectory(normal_dir)
 end
 
 function initVersusMod()
@@ -287,6 +296,17 @@ function initVersusMod()
     VSMOD_GLOBALS.lobby_id = ""
     VSMOD_GLOBALS.opponent_chips = 0
     VSMOD_GLOBALS.normal_mode = true
+
+    local config = nativefs.read("vsmod_config.json")
+
+    if config then
+        local decoded = json.decode(config)
+        if decoded.ip_address then
+            VSMOD_GLOBALS.ip_address = decoded.ip_address
+        end
+    end
+
+    VSMOD_GLOBALS.FUNCS.vs_connect()
 end
 
 function makeMultiplayerTab()
