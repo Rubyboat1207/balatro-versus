@@ -11,7 +11,8 @@ VSMOD_GLOBALS = {
         awaiting_connect = false
     },
     REWARDS = {},
-    imp_card = {}
+    imp_card = {},
+    JOKERS = {}
 }
 VSMOD_GLOBALS.FUNCS = {}
 
@@ -205,6 +206,34 @@ function VSMOD_GLOBALS.REWARDS.random_joker(data)
     }))
 end
 
+function VSMOD_GLOBALS.REWARDS.create_joker(data) 
+    G.GAME.joker_buffer = G.GAME.joker_buffer + 1
+    G.E_MANAGER:add_event(Event({
+        func = function()
+            joker = nil
+            if data.modded then
+                joker = VSMOD_GLOBALS.JOKERS[data.joker]
+            else
+                joker = find_joker(data.joker)
+            end
+
+            if not joker then
+                return
+            end
+            local _T = G.jokers.T
+
+            local card = Card(_T.x, _T.y, G.CARD_W, G.CARD_H, G.P_CARDS.empty, goulish_imp ,{discover = true, bypass_discovery_center = true, bypass_discovery_ui = true, bypass_back = G.GAME.selected_back.pos })
+            card:set_perishable(true)
+            card:set_edition({ negative = true }, true)
+            card:add_to_deck()
+            G.jokers:emplace(card)
+            card:start_materialize()
+            G.GAME.joker_buffer = G.GAME.joker_buffer - 1
+            return true
+        end
+    }))
+end
+
 function VSMOD_GLOBALS.REWARDS.random_consumable(data)
     G.GAME.consumeable_buffer = G.GAME.consumeable_buffer + 1
     G.E_MANAGER:add_event(Event({
@@ -231,7 +260,7 @@ function vsmod_update()
     -- Check for received data
     monitor_connection()
 
-    if G.STATE >= 3 then
+    if G.STATE >= 3 and G.STATE ~= 8 then
         VSMOD_GLOBALS.opponent_chips = 0
     else
         VSMOD_GLOBALS.opponent_chips = VSMOD_GLOBALS.SCORES[G.GAME.round + G.GAME.skips] or 0
@@ -264,12 +293,30 @@ function vsmod_update()
             love.thread.getChannel('tcp_signal'):push('disconnect')
         elseif decoded.type == "last_on_blind" then
             VSMOD_GLOBALS.last_on_blind[json.decode(decoded.data)] = true
-        elseif decoded.type == "delete_card" then
+        elseif decoded.type == "hand_effect" then
+            if G.STATE >= 3 then
+                return
+            end
             local data = json.decode(decoded.data)
             
-            if data.kind == "playing_card" then
-                local card = pseudorandom_element(G.playing_cards, psuedoseed('delete_card'..G.GAME.round + G.GAME.skips)):delete()
-                card:start_dissolve(nil, i == #destroyed_cards)
+            local valid_cards = {}
+
+            for k, v in ipairs(G.hand.cards) do
+                if data.selector == "random" then
+                    valid_cards[#valid_cards+1] = v
+                end
+            end
+            
+            card = nil
+
+            if data.selector == "random" then
+                card = pseudorandom_element(valid_cards, pseudoseed('select'))
+            end
+            
+            if data.effect == "force_select" then
+                G.hand:unhighlight_all()
+                card.ability.forced_selection = true
+                G.hand:add_to_highlighted(card)
             end
         end
     end
@@ -392,20 +439,6 @@ function onHandScored(hand_score)
                 G.GAME.round + G.GAME.skips
         })
     }))
-    -- only commented out becuase i may need to use card generation logic later.
-    -- G.E_MANAGER:add_event(Event({
-    --     func = function()
-    --         local _T = G.jokers.T
-
-    --         local card = Card(_T.x, _T.y, G.CARD_W, G.CARD_H, G.P_CARDS.empty, goulish_imp ,{discover = true, bypass_discovery_center = true, bypass_discovery_ui = true, bypass_back = G.GAME.selected_back.pos })
-
-    --         card:add_to_deck()
-    --         G.jokers:emplace(card)
-    --         card:start_materialize()
-    --         G.GAME.joker_buffer = G.GAME.joker_buffer - 1
-    --         return true
-    --     end
-    -- }))
 end
 
 function getOpponentScoreUI()
@@ -476,13 +509,14 @@ SMODS.Atlas {
     py = 93
 }
 
-goulish_imp = SMODS.Joker {
+VSMOD_GLOBALS.JOKERS.ghoulish_imp = SMODS.Joker {
     key = "ghoulish_imp",
     loc_txt = {
         name = "Ghoulish Imp",
         text = {
             "for each hand with a {C:attention}#1#{} played",
-            "another player loses a card permanently.",
+            "cause a player currently playing a blind to",
+            "have a card force selected",
             "changes every round",
         }
     },
@@ -492,11 +526,12 @@ goulish_imp = SMODS.Joker {
     end,
     atlas = "VersusJokers",
     cost = 3,
+    yes_pool_flag = 'never',
     calculate = function(self, card, context)
         if context.cardarea == G.jokers and context.before then
             for _, v in ipairs(context.scoring_hand) do
                 if v:get_id() == VSMOD_GLOBALS.imp_card.id then
-                    sendChannel:push(json.encode({
+                    love.thread.getChannel('tcp_send'):push(json.encode({
                         type = "multiplayer_joker_ability",
                         data = json.encode({
                             joker = "ghoulish_imp"
