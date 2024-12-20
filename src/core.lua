@@ -1,6 +1,5 @@
 local socket = require "socket"
 local json = require "json"
-local nativefs = require "nativefs"
 local lovely = require "lovely"
 
 VSMOD_GLOBALS = {
@@ -11,7 +10,8 @@ VSMOD_GLOBALS = {
         connected = false,
         awaiting_connect = false
     },
-    REWARDS = {}
+    REWARDS = {},
+    imp_card = {}
 }
 VSMOD_GLOBALS.FUNCS = {}
 
@@ -152,10 +152,30 @@ function vsmod_round_ended(game_over)
         })
     }))
     VSMOD_GLOBALS.started_remotely = nil
+    VSMOD_GLOBALS.imp_card = update_imp_card()
+end
+
+function update_imp_card()
+    local card = {
+        rank = "Ace"
+    }
+    local valid_cards = {}
+    for k, v in ipairs(G.playing_cards) do
+        if v.ability.effect ~= 'Stone Card' then
+            valid_cards[#valid_cards+1] = v
+        end
+    end
+    if valid_cards[1] then 
+        local imp_card = pseudorandom_element(valid_cards, pseudoseed('imp'..G.GAME.round_resets.ante))
+        card.rank = imp_card.base.value
+        card.id = imp_card.base.id
+    end
+    return card
 end
 
 function vsmod_run_start()
     VSMOD_GLOBALS.SCORES = {}
+    VSMOD_GLOBALS.imp_card = update_imp_card()
     local sendChannel = love.thread.getChannel('tcp_send')
     sendChannel:push(json.encode({
         type = "start_game",
@@ -166,6 +186,7 @@ function vsmod_run_start()
             deck = G.GAME.selected_back.name
         })
     }))
+
 end
 
 function VSMOD_GLOBALS.REWARDS.random_joker(data)
@@ -243,6 +264,13 @@ function vsmod_update()
             love.thread.getChannel('tcp_signal'):push('disconnect')
         elseif decoded.type == "last_on_blind" then
             VSMOD_GLOBALS.last_on_blind[json.decode(decoded.data)] = true
+        elseif decoded.type == "delete_card" then
+            local data = json.decode(decoded.data)
+            
+            if data.kind == "playing_card" then
+                local card = pseudorandom_element(G.playing_cards, psuedoseed('delete_card'..G.GAME.round + G.GAME.skips)):delete()
+                card:start_dissolve(nil, i == #destroyed_cards)
+            end
         end
     end
 end
@@ -364,6 +392,20 @@ function onHandScored(hand_score)
                 G.GAME.round + G.GAME.skips
         })
     }))
+    -- only commented out becuase i may need to use card generation logic later.
+    -- G.E_MANAGER:add_event(Event({
+    --     func = function()
+    --         local _T = G.jokers.T
+
+    --         local card = Card(_T.x, _T.y, G.CARD_W, G.CARD_H, G.P_CARDS.empty, goulish_imp ,{discover = true, bypass_discovery_center = true, bypass_discovery_ui = true, bypass_back = G.GAME.selected_back.pos })
+
+    --         card:add_to_deck()
+    --         G.jokers:emplace(card)
+    --         card:start_materialize()
+    --         G.GAME.joker_buffer = G.GAME.joker_buffer - 1
+    --         return true
+    --     end
+    -- }))
 end
 
 function getOpponentScoreUI()
@@ -427,5 +469,49 @@ function getOpponentScoreUI()
     }
 end
 
+SMODS.Atlas {
+    key = "VersusJokers",
+    path = "jokers.png",
+    px = 69,
+    py = 93
+}
+
+goulish_imp = SMODS.Joker {
+    key = "ghoulish_imp",
+    loc_txt = {
+        name = "Ghoulish Imp",
+        text = {
+            "for each hand with a {C:attention}#1#{} played",
+            "another player loses a card permanently.",
+            "changes every round",
+        }
+    },
+    rarity = 3,
+    loc_vars = function(self, info_queue, card)
+        return { vars = { VSMOD_GLOBALS.imp_card.rank } }
+    end,
+    atlas = "VersusJokers",
+    cost = 3,
+    calculate = function(self, card, context)
+        if context.cardarea == G.jokers and context.before then
+            for _, v in ipairs(context.scoring_hand) do
+                if v:get_id() == VSMOD_GLOBALS.imp_card.id then
+                    sendChannel:push(json.encode({
+                        type = "multiplayer_joker_ability",
+                        data = json.encode({
+                            joker = "ghoulish_imp"
+                        })
+                    }))
+                
+                    return {
+                        message = "curse",
+                        colour = G.C.MULT,
+                        card = self
+                    }
+                end
+            end
+        end
+    end
+}
 
 initVersusMod()
