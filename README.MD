@@ -26,7 +26,7 @@ The balatro versus mod is a 2+ player experience (in early development) in which
 
 ## Installation
 
-This mod requires [lovely injector](https://github.com/ethangreen-dev/lovely-injector), as of writing, it is installed by downloading the latest release or artifact from actions and placing version.dll next to the exe.
+This mod requires [lovely injector](https://github.com/ethangreen-dev/lovely-injector), as of writing, it is installed by downloading the latest release or artifact from actions and placing version.dll next to the exe. This mod also requires [Steammodded](https://github.com/Steamopollys/Steamodded)
 
 
 ### Installation Method 1 (Recommended)
