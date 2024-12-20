@@ -1,4 +1,4 @@
-# ![logo](resources/1x/versus-logo.png)
+# ![logo](assets/1x/versus-logo.png)
 
 ## Balatro Versus Mod
 
