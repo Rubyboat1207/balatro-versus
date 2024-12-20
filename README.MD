@@ -39,6 +39,7 @@ This mod requires [lovely injector](https://github.com/ethangreen-dev/lovely-inj
 
 ```
 git clone https://github.com/Rubyboat1207/balatro-versus.git
+git clone https://github.com/Steamopollys/Steamodded.git
 ```
 
 Whenever you need to update the mod, simply run the following in the mod's folder
@@ -57,6 +58,8 @@ git pull
 
 > [!WARNING]
 > The Folder must be named "balatro-versus" (case sensitive)
+
+4. Download and Install [Steammodded](https://github.com/Steamopollys/Steamodded) 
 
 ## Usage
 > [!NOTE]
