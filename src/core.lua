@@ -17,8 +17,8 @@ VSMOD_GLOBALS = {
 VSMOD_GLOBALS.FUNCS = {}
 
 local function connect()
-    if nativefs.read("vsmod_config.json") == nil then
-        nativefs.write("vsmod_config.json", json.encode({ ip_address = VSMOD_GLOBALS.ip_address }))
+    if NFS.read("vsmod_config.json") == nil then
+        NFS.write("vsmod_config.json", json.encode({ ip_address = VSMOD_GLOBALS.ip_address }))
     end
 
     tcp_recv = "local ip= ...\n function giveMeJSON()" ..
@@ -222,7 +222,7 @@ function VSMOD_GLOBALS.REWARDS.create_joker(data)
             end
             local _T = G.jokers.T
 
-            local card = Card(_T.x, _T.y, G.CARD_W, G.CARD_H, G.P_CARDS.empty, goulish_imp ,{discover = true, bypass_discovery_center = true, bypass_discovery_ui = true, bypass_back = G.GAME.selected_back.pos })
+            local card = Card(_T.x, _T.y, G.CARD_W, G.CARD_H, G.P_CARDS.empty, joker ,{discover = true, bypass_discovery_center = true, bypass_discovery_ui = true, bypass_back = G.GAME.selected_back.pos })
             card:set_perishable(true)
             card:set_edition({ negative = true }, true)
             card:add_to_deck()
@@ -346,35 +346,13 @@ function vsmod_should_end_round()
     return false
 end
 
-function vsmod_loadAssets(game)
-    local normal_dir = nativefs.getWorkingDirectory()
-    local vsmod_dir = lovely.mod_dir:gsub("/$", "")
-    nativefs.setWorkingDirectory(vsmod_dir .. '/balatro-versus')
-
-    local logo_data = nativefs.newFileData("resources/1x/versus-ingame.png")
-    if logo_data == nil then
-        print("Failed to load versus logo")
-        return
-    end
-
-    G.ASSET_ATLAS["versus"] = {
-        name = "versus",
-        image = love.graphics.newImage(love.image.newImageData(logo_data),
-            { mipmaps = true, dpiscale = G.SETTINGS.GRAPHICS.texture_scaling }),
-        px = 835,
-        py = 348
-    }
-
-    nativefs.setWorkingDirectory(normal_dir)
-end
-
 function initVersusMod()
     VSMOD_GLOBALS.ip_address = ""
     VSMOD_GLOBALS.lobby_id = ""
     VSMOD_GLOBALS.opponent_chips = 0
     VSMOD_GLOBALS.normal_mode = true
 
-    local config = nativefs.read("vsmod_config.json")
+    local config = NFS.read("vsmod_config.json")
 
     if config then
         local decoded = json.decode(config)
@@ -515,7 +493,7 @@ VSMOD_GLOBALS.JOKERS.ghoulish_imp = SMODS.Joker {
         name = "Ghoulish Imp",
         text = {
             "for each hand with a {C:attention}#1#{} played",
-            "cause a player currently playing a blind to",
+            "cause any player currently playing a blind to",
             "have a card force selected",
             "changes every round",
         }
