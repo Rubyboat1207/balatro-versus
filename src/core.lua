@@ -194,7 +194,7 @@ function VSMOD_GLOBALS.REWARDS.random_joker(data)
     G.GAME.joker_buffer = G.GAME.joker_buffer + 1
     G.E_MANAGER:add_event(Event({
         func = function()
-            local card = create_card('Joker', G.jokers, nil, data, nil, nil, nil, 'pri')
+            local card = create_card('Joker', G.jokers, nil, data.rarity, nil, nil, nil, 'pri')
             card:set_perishable(true)
             card:set_edition({ negative = true }, true)
             card:add_to_deck()
