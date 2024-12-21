@@ -1,5 +1,4 @@
 local json = require "json"
-local socket = require("socket")
 
 VSMOD_GLOBALS = {
     SCORES = {},
@@ -17,14 +16,13 @@ VSMOD_GLOBALS = {
     CONSUMABLES = {},
     HEARTBEAT_TIMER = 15,
     TIME_SINCE_HEARTBEAT = 0,
-    CONNECT_BUTTON = nil
 }
 VSMOD_GLOBALS.FUNCS = {}
 
 local function connect()
     NFS.write("vsmod_config.json", json.encode({ ip_address = VSMOD_GLOBALS.ip_address }))
-
-    socket.tcp()
+    VSMOD_GLOBALS.HEARTBEAT_TIMER = 15
+    VSMOD_GLOBALS.TIME_SINCE_HEARTBEAT = 0
 
     tcp_recv = "local ip= ...\n function giveMeJSON()" ..
         json.literally_the_entire_library_as_a_string .. "\nend\n" .. [[
@@ -50,12 +48,10 @@ local function connect()
         local sendChannel = love.thread.getChannel('tcp_send')
         local recvChannel = love.thread.getChannel('tcp_recv')
         printoutChannel:push("Connected to " .. ip)
-        signalChannel:push("connected")
 
         while true do
             -- Handle incoming messages
             local data, status = tcp:receive("*l")
-            printoutChannel:push(tcp)
             if data then
                 printoutChannel:push(data)
             end
@@ -106,12 +102,16 @@ local function monitor_connection()
         end
 
         if VSMOD_GLOBALS.HEARTBEAT_TIMER == 0 then
-            sendChannel:push(json.encode({
-                type = "heartbeat"
-            }))
+            if VSMOD_GLOBALS.TIME_SINCE_HEARTBEAT == 0 then
+                sendChannel:push(json.encode({
+                    type = "heartbeat"
+                }))
+                print('sent heartbeat')
+            end
 
-            VSMOD_GLOBALS.HEARTBEAT_TIMER = VSMOD_GLOBALS.HEARTBEAT_TIMER + dt
-            if VSMOD_GLOBALS.HEARTBEAT_TIMER > 5 then
+            VSMOD_GLOBALS.TIME_SINCE_HEARTBEAT = VSMOD_GLOBALS.TIME_SINCE_HEARTBEAT + dt
+            if VSMOD_GLOBALS.TIME_SINCE_HEARTBEAT > 5 then
+                print('connection didnt respond to the heartbeat fast enough. disconnecting')
                 signal:push('disconnect')
             end
         end
@@ -119,7 +119,7 @@ local function monitor_connection()
     
 
     if latest_signal == "disconnected" then
-        print('old connection successfully disconnected, making new connection')
+        print('old connection successfully disconnected')
         signal:pop()
         cs.connected = false
     end
@@ -151,7 +151,7 @@ local function monitor_connection()
     end
 end
 
-function VSMOD_GLOBALS.FUNCS.vs_connect(e)
+function VSMOD_GLOBALS.FUNCS.vs_connect()
     VSMOD_GLOBALS.normal_mode = false
     love.thread.getChannel('tcp_recv'):clear()
     love.thread.getChannel('tcp_send'):clear()
@@ -166,8 +166,18 @@ function VSMOD_GLOBALS.FUNCS.vs_connect(e)
         VSMOD_GLOBALS.connection_state.awaiting_disconnect = true
         signal:push('disconnect')
     end
+end
 
-    VSMOD_GLOBALS.CONNECT_BUTTON = e
+function VSMOD_GLOBALS.FUNCS.vs_disconnect(e)
+    love.thread.getChannel('tcp_recv'):clear()
+    local signal = love.thread.getChannel('tcp_signal')
+    signal:clear()
+
+    if VSMOD_GLOBALS.connection_state.connected then
+        print("old connection exists, pushing disconnect signal")
+        VSMOD_GLOBALS.connection_state.awaiting_disconnect = true
+        signal:push('disconnect')
+    end
 end
 
 function VSMOD_GLOBALS.FUNCS.vs_joinlobby()
@@ -466,15 +476,16 @@ function makeMultiplayerTab()
     local ref_val = "ip_address"
     local label_txt = "Connect To Server"
     local fn = "vs_connect"
+    local disconnect_button = nil
 
     if VSMOD_GLOBALS.connection_state.connected then
         ptext = "Lobby Id"
         ref_val = "lobby_id"
         label_txt = "Join Lobby"
         fn = "vs_joinlobby"
+        disconnect_button = UIBox_button { button = "vs_disconnect", colour = G.C.RED, minw = 2.65, minh = 1.35, label = { "Disconnect" }, scale = 1.2, col = true }
     end
     local btn = UIBox_button { button = fn, colour = G.C.BLUE, minw = 2.65, minh = 1.35, label = { label_txt }, scale = 1.2, col = true }
-
     return {
         n = G.UIT.ROOT,
         config = { align = "cm", padding = 0.05, colour = G.C.CLEAR },
@@ -496,7 +507,8 @@ function makeMultiplayerTab()
                                 ref_value = ref_val,
                                 prompt_text = ptext,
                             }),
-                            btn
+                            btn,
+                            disconnect_button
                         }
                     }
                 }
