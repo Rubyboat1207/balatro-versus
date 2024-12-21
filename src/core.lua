@@ -22,9 +22,7 @@ VSMOD_GLOBALS = {
 VSMOD_GLOBALS.FUNCS = {}
 
 local function connect()
-    if NFS.read("vsmod_config.json") == nil then
-        NFS.write("vsmod_config.json", json.encode({ ip_address = VSMOD_GLOBALS.ip_address }))
-    end
+    NFS.write("vsmod_config.json", json.encode({ ip_address = VSMOD_GLOBALS.ip_address }))
 
     socket.tcp()
 
@@ -420,12 +418,6 @@ function vsmod_update()
             VSMOD_GLOBALS.TIME_SINCE_HEARTBEAT = 0
         end
     end
-
-    if VSMOD_GLOBALS.CONNECT_BUTTON == nil then
-        print("connect button is nil")
-    else
-        print("connect button is not nil")
-    end
 end
 
 function vsmod_should_end_round()
@@ -457,7 +449,6 @@ function initVersusMod()
     VSMOD_GLOBALS.lobby_id = ""
     VSMOD_GLOBALS.opponent_chips = 0
     VSMOD_GLOBALS.normal_mode = true
-
     local config = NFS.read("vsmod_config.json")
 
     if config then
