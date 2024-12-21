@@ -1,6 +1,5 @@
-local socket = require "socket"
 local json = require "json"
-local lovely = require "lovely"
+local socket = require("socket")
 
 VSMOD_GLOBALS = {
     SCORES = {},
@@ -8,11 +7,17 @@ VSMOD_GLOBALS = {
     last_on_blind = {},
     connection_state = {
         connected = false,
-        awaiting_connect = false
+        awaiting_connect = false,
+        just_connected = false
     },
+    CARD_EFFECTS = {},
     REWARDS = {},
     imp_card = {},
-    JOKERS = {}
+    JOKERS = {},
+    CONSUMABLES = {},
+    HEARTBEAT_TIMER = 15,
+    TIME_SINCE_HEARTBEAT = 0,
+    CONNECT_BUTTON = nil
 }
 VSMOD_GLOBALS.FUNCS = {}
 
@@ -20,6 +25,8 @@ local function connect()
     if NFS.read("vsmod_config.json") == nil then
         NFS.write("vsmod_config.json", json.encode({ ip_address = VSMOD_GLOBALS.ip_address }))
     end
+
+    socket.tcp()
 
     tcp_recv = "local ip= ...\n function giveMeJSON()" ..
         json.literally_the_entire_library_as_a_string .. "\nend\n" .. [[
@@ -45,10 +52,12 @@ local function connect()
         local sendChannel = love.thread.getChannel('tcp_send')
         local recvChannel = love.thread.getChannel('tcp_recv')
         printoutChannel:push("Connected to " .. ip)
+        signalChannel:push("connected")
 
         while true do
             -- Handle incoming messages
             local data, status = tcp:receive("*l")
+            printoutChannel:push(tcp)
             if data then
                 printoutChannel:push(data)
             end
@@ -85,14 +94,55 @@ end
 
 local function monitor_connection()
     local signal = love.thread.getChannel('tcp_signal')
+    local sendChannel = love.thread.getChannel('tcp_send')
+    local dt = love.timer.getDelta( )
 
     local latest_signal = signal:peek()
     local cs = VSMOD_GLOBALS.connection_state
+
+    if cs.connected then
+        if VSMOD_GLOBALS.HEARTBEAT_TIMER > 0 then
+            VSMOD_GLOBALS.HEARTBEAT_TIMER = VSMOD_GLOBALS.HEARTBEAT_TIMER - dt
+        else
+            VSMOD_GLOBALS.HEARTBEAT_TIMER = 0
+        end
+
+        if VSMOD_GLOBALS.HEARTBEAT_TIMER == 0 then
+            sendChannel:push(json.encode({
+                type = "heartbeat"
+            }))
+
+            VSMOD_GLOBALS.HEARTBEAT_TIMER = VSMOD_GLOBALS.HEARTBEAT_TIMER + dt
+            if VSMOD_GLOBALS.HEARTBEAT_TIMER > 5 then
+                signal:push('disconnect')
+            end
+        end
+    end
+    
 
     if latest_signal == "disconnected" then
         print('old connection successfully disconnected, making new connection')
         signal:pop()
         cs.connected = false
+    end
+
+    if VSMOD_GLOBALS.connection_state.just_connected then
+        VSMOD_GLOBALS.connection_state.just_connected = false
+    end
+
+    if latest_signal == "connected" then
+        VSMOD_GLOBALS.connection_state.just_connected = true
+        signal:pop()
+        -- local tc = VSMOD_GLOBALS.CONNECT_BUTTON.UIBox.UIRoot:get_UIE_by_ID('tab_contents')
+        -- if tc then
+        --     tc.config.object:remove()
+        --     tc.config.object = UIBox{
+        --         definition = G.UIDEF.settings_tab("Multiplayer"),
+        --         config = {offset = {x=0,y=0}, parent = tc, type = 'cm'}
+        --         }
+        --     tc.UIBox:recalculate()
+        -- end
+
     end
 
     if cs.awaiting_connect and cs.connected == false then
@@ -103,7 +153,7 @@ local function monitor_connection()
     end
 end
 
-function VSMOD_GLOBALS.FUNCS.vs_connect()
+function VSMOD_GLOBALS.FUNCS.vs_connect(e)
     VSMOD_GLOBALS.normal_mode = false
     love.thread.getChannel('tcp_recv'):clear()
     love.thread.getChannel('tcp_send'):clear()
@@ -119,6 +169,7 @@ function VSMOD_GLOBALS.FUNCS.vs_connect()
         signal:push('disconnect')
     end
 
+    VSMOD_GLOBALS.CONNECT_BUTTON = e
 end
 
 function VSMOD_GLOBALS.FUNCS.vs_joinlobby()
@@ -210,25 +261,50 @@ function VSMOD_GLOBALS.REWARDS.create_joker(data)
     G.GAME.joker_buffer = G.GAME.joker_buffer + 1
     G.E_MANAGER:add_event(Event({
         func = function()
-            joker = nil
+            consumbale = nil
             if data.modded then
-                joker = VSMOD_GLOBALS.JOKERS[data.joker]
+                consumbale = VSMOD_GLOBALS.JOKERS[data.card]
             else
-                joker = find_joker(data.joker)
+                consumbale = find_joker(data.card)
             end
 
-            if not joker then
+            if not consumbale then
                 return
             end
             local _T = G.jokers.T
 
-            local card = Card(_T.x, _T.y, G.CARD_W, G.CARD_H, G.P_CARDS.empty, joker ,{discover = true, bypass_discovery_center = true, bypass_discovery_ui = true, bypass_back = G.GAME.selected_back.pos })
+            local card = Card(_T.x, _T.y, G.CARD_W, G.CARD_H, G.P_CARDS.empty, consumbale ,{discover = true, bypass_discovery_center = true, bypass_discovery_ui = true, bypass_back = G.GAME.selected_back.pos })
             card:set_perishable(true)
             card:set_edition({ negative = true }, true)
             card:add_to_deck()
             G.jokers:emplace(card)
             card:start_materialize()
             G.GAME.joker_buffer = G.GAME.joker_buffer - 1
+            return true
+        end
+    }))
+end
+
+function VSMOD_GLOBALS.REWARDS.create_consumable(data) 
+    G.GAME.consumeable_buffer = G.GAME.consumeable_buffer + 1
+    G.E_MANAGER:add_event(Event({
+        func = function()
+            consumable = nil
+            if data.modded then
+                consumable = VSMOD_GLOBALS.CONSUMABLES[data.card]
+            else
+                consumable = find_joker(data.card) -- dont know why this function was designed to work with consumables, but boy am I happy about it!
+            end
+
+            if not consumable then
+                return
+            end
+            local _T = G.consumeables.T
+
+            local card = Card(_T.x, _T.y, G.CARD_W, G.CARD_H, G.P_CARDS.empty, consumable ,{discover = true, bypass_discovery_center = true, bypass_discovery_ui = true, bypass_back = G.GAME.selected_back.pos })
+            card:add_to_deck()
+            G.consumeables:emplace(card)
+            G.GAME.consumeable_buffer = G.GAME.consumeable_buffer - 1
             return true
         end
     }))
@@ -249,6 +325,15 @@ end
 
 function VSMOD_GLOBALS.REWARDS.gain_money(data)
     ease_dollars(data, false)
+end
+
+function VSMOD_GLOBALS.CARD_EFFECTS.flip(card)
+    card:flip()
+end
+
+function VSMOD_GLOBALS.CARD_EFFECTS.force_select(card)
+    card.ability.forced_selection = true
+    G.hand:add_to_highlighted(card)
 end
 
 function vsmod_update()
@@ -297,28 +382,49 @@ function vsmod_update()
             if G.STATE >= 3 then
                 return
             end
+            
             local data = json.decode(decoded.data)
             
             local valid_cards = {}
-
+            
             for k, v in ipairs(G.hand.cards) do
-                if data.selector == "random" then
+                if data.selector == "random" or data.selector == "all" then
                     valid_cards[#valid_cards+1] = v
+                end
+                if data.selector == "half" then
+                    if k % 2 == 0 then
+                        valid_cards[#valid_cards+1] = v
+                    end
                 end
             end
             
-            card = nil
-
+            local card = nil
+            
             if data.selector == "random" then
                 card = pseudorandom_element(valid_cards, pseudoseed('select'))
             end
             
-            if data.effect == "force_select" then
-                G.hand:unhighlight_all()
-                card.ability.forced_selection = true
-                G.hand:add_to_highlighted(card)
+            if data.selector == "all" or data.selector == "half" then
+                card = valid_cards
             end
+
+            if type(card) == "table" then
+                for _, selected_card in ipairs(card) do
+                    VSMOD_GLOBALS.CARD_EFFECTS[data.effect](selected_card)
+                end
+            else
+                VSMOD_GLOBALS.CARD_EFFECTS[data.effect](card)
+            end
+        elseif decoded.type == 'heartbeat' then
+            VSMOD_GLOBALS.HEARTBEAT_TIMER = 15
+            VSMOD_GLOBALS.TIME_SINCE_HEARTBEAT = 0
         end
+    end
+
+    if VSMOD_GLOBALS.CONNECT_BUTTON == nil then
+        print("connect button is nil")
+    else
+        print("connect button is not nil")
     end
 end
 
@@ -376,6 +482,8 @@ function makeMultiplayerTab()
         label_txt = "Join Lobby"
         fn = "vs_joinlobby"
     end
+    local btn = UIBox_button { button = fn, colour = G.C.BLUE, minw = 2.65, minh = 1.35, label = { label_txt }, scale = 1.2, col = true }
+
     return {
         n = G.UIT.ROOT,
         config = { align = "cm", padding = 0.05, colour = G.C.CLEAR },
@@ -397,8 +505,7 @@ function makeMultiplayerTab()
                                 ref_value = ref_val,
                                 prompt_text = ptext,
                             }),
-                            UIBox_button { button = fn, colour = G.C.BLUE, minw = 2.65, minh = 1.35, label = { label_txt }, scale = 1.2, col = true } or
-                            nil,
+                            btn
                         }
                     }
                 }
@@ -487,6 +594,13 @@ SMODS.Atlas {
     py = 93
 }
 
+SMODS.Atlas {
+    key = "VersusConsumables",
+    path = "tarot.png",
+    px = 69,
+    py = 93
+}
+
 VSMOD_GLOBALS.JOKERS.ghoulish_imp = SMODS.Joker {
     key = "ghoulish_imp",
     loc_txt = {
@@ -510,9 +624,9 @@ VSMOD_GLOBALS.JOKERS.ghoulish_imp = SMODS.Joker {
             for _, v in ipairs(context.scoring_hand) do
                 if v:get_id() == VSMOD_GLOBALS.imp_card.id then
                     love.thread.getChannel('tcp_send'):push(json.encode({
-                        type = "multiplayer_joker_ability",
+                        type = "ability_used",
                         data = json.encode({
-                            joker = "ghoulish_imp"
+                            ability = "force_select_single"
                         })
                     }))
                 
@@ -526,5 +640,34 @@ VSMOD_GLOBALS.JOKERS.ghoulish_imp = SMODS.Joker {
         end
     end
 }
+
+VSMOD_GLOBALS.CONSUMABLES.mask = SMODS.Consumable({
+    set = "Tarot",
+    key = "mask",
+    pos = {
+        x = 0,
+        y = 0
+    },
+    loc_txt = {
+        name = "Mask",
+        text = {
+            "For all opponents",
+            "every other card is flipped over",
+            "for current hand"
+        }
+    },
+    atlas = 'VersusConsumables',
+    cost = 7,
+    discovered = true,
+    can_use = function() return true end,
+    use = function() 
+        love.thread.getChannel('tcp_send'):push(json.encode({
+            type = "ability_used",
+            data = json.encode({
+                ability = "flip_half"
+            })
+        }))
+    end
+})
 
 initVersusMod()
