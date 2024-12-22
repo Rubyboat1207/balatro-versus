@@ -53,7 +53,7 @@ local function connect()
             -- Handle incoming messages
             local data, status = tcp:receive("*l")
             if data then
-                printoutChannel:push(data)
+                printoutChannel:push(data .. "\n")
             end
             if status == "closed" then
                 break
@@ -122,6 +122,7 @@ local function monitor_connection()
         print('old connection successfully disconnected')
         signal:pop()
         cs.connected = false
+        VSMOD_GLOBALS.in_lobby = false
     end
 
     if VSMOD_GLOBALS.connection_state.just_connected then
@@ -426,16 +427,18 @@ function vsmod_update()
         elseif decoded.type == 'heartbeat' then
             VSMOD_GLOBALS.HEARTBEAT_TIMER = 15
             VSMOD_GLOBALS.TIME_SINCE_HEARTBEAT = 0
+        elseif decoded.type == 'lobby_joined' then
+            VSMOD_GLOBALS.in_lobby = true
         end
     end
 end
 
 function vsmod_should_end_round()
     if
-        not VSMOD_GLOBALS.connection_state.connected or
+        not VSMOD_GLOBALS.in_lobby or
         (
-            VSMOD_GLOBALS.last_on_blind["" .. G.GAME.round + G.GAME.skips] and
-            G.GAME.chips > VSMOD_GLOBALS.SCORES[G.GAME.round + G.GAME.skips]
+            VSMOD_GLOBALS.last_on_blind["" .. G.GAME.round + G.GAME.skips] and VSMOD_GLOBALS.SCORES["" .. G.GAME.round + G.GAME.skips] and
+            G.GAME.chips > VSMOD_GLOBALS.SCORES["" .. G.GAME.round + G.GAME.skips]
         )
     then
         return G.GAME.chips - G.GAME.blind.chips >= 0 or G.GAME.current_round.hands_left < 1
@@ -632,6 +635,8 @@ VSMOD_GLOBALS.JOKERS.ghoulish_imp = SMODS.Joker {
                             ability = "force_select_single"
                         })
                     }))
+
+                    print("skill issue")
                 
                     return {
                         message = "curse",
