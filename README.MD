@@ -33,7 +33,7 @@ This mod requires [lovely injector](https://github.com/ethangreen-dev/lovely-inj
 
 1. Install git or git for windows
 
-2. navigate to the mods directory in the command line. (windows: `%AppData%/Balatro/Mods`, mac: `/Users/$USER/Library/Application Support/Balatro/Mods`) 
+2. navigate to the mods directory in the command line. (windows: `%AppData%/Balatro/Mods`, mac: `/Users/$USER/Library/Application Support/Balatro/Mods`) Create them if it doesn't exist, if you haven't downloaded any mods before, this folder wont exist.
 
 3. enter the following in the command line
 
