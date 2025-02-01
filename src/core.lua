@@ -16,7 +16,8 @@ VSMOD_GLOBALS = {
     CONSUMABLES = {},
     HEARTBEAT_TIMER = 15,
     TIME_SINCE_HEARTBEAT = 0,
-    VICTORY_NOTIFICATION = nil
+    VICTORY_NOTIFICATION = nil,
+    VISUAL_OPPONENT_SCORE = ""
 }
 VSMOD_GLOBALS.FUNCS = {}
 
@@ -49,6 +50,7 @@ local function connect()
         local sendChannel = love.thread.getChannel('tcp_send')
         local recvChannel = love.thread.getChannel('tcp_recv')
         printoutChannel:push("Connected to " .. ip)
+        signalChannel:push("connected")
 
         while true do
             -- Handle incoming messages
@@ -85,6 +87,21 @@ local function connect()
     ]]
 
     love.thread.newThread(tcp_recv):start(VSMOD_GLOBALS.ip_address)
+end
+
+local function update_mp_tab()
+    if G.OVERLAY_MENU then
+        local tab_contents = G.OVERLAY_MENU:get_UIE_by_ID('tab_contents')
+        local mp_tab = G.OVERLAY_MENU:get_UIE_by_ID('mp_tab_content')
+        if tab_contents and mp_tab then
+            tab_contents.config.object:remove()
+            tab_contents.config.object = UIBox{
+                definition = G.UIDEF.settings_tab("Multiplayer"),
+                config = {offset = {x=0,y=0}, parent = tab_contents, type = 'cm'}
+            }
+            tab_contents.UIBox:recalculate()
+        end
+    end
 end
 
 local function monitor_connection()
@@ -124,25 +141,17 @@ local function monitor_connection()
         signal:pop()
         cs.connected = false
         VSMOD_GLOBALS.in_lobby = false
+        update_mp_tab()
     end
 
     if VSMOD_GLOBALS.connection_state.just_connected then
         VSMOD_GLOBALS.connection_state.just_connected = false
+        update_mp_tab()
     end
 
     if latest_signal == "connected" then
         VSMOD_GLOBALS.connection_state.just_connected = true
         signal:pop()
-        -- local tc = VSMOD_GLOBALS.CONNECT_BUTTON.UIBox.UIRoot:get_UIE_by_ID('tab_contents')
-        -- if tc then
-        --     tc.config.object:remove()
-        --     tc.config.object = UIBox{
-        --         definition = G.UIDEF.settings_tab("Multiplayer"),
-        --         config = {offset = {x=0,y=0}, parent = tc, type = 'cm'}
-        --         }
-        --     tc.UIBox:recalculate()
-        -- end
-
     end
 
     if cs.awaiting_connect and cs.connected == false then
@@ -411,8 +420,9 @@ function vsmod_update()
     -- Check for received data
     monitor_connection()
 
-    if G.STATE >= 3 and G.STATE ~= 8 then
+    if G.STATE > 3 and G.STATE ~= 8 then
         VSMOD_GLOBALS.opponent_chips = 0
+        VSMOD_GLOBALS.VISUAL_OPPONENT_SCORE = "0"
     else
         VSMOD_GLOBALS.opponent_chips = VSMOD_GLOBALS.SCORES[G.GAME.round + G.GAME.skips] or 0
     end
@@ -427,11 +437,38 @@ function vsmod_update()
             end
         elseif decoded.type == "start_game" then
             local game_data = json.decode(decoded.data)
-            G.GAME.viewed_back = get_deck_from_name(game_data.deck)
-            G.GAME.selected_back = G.GAME.viewed_back
-            G.FUNCS.start_run(nil, { stake = game_data.stake, seed = game_data.seed, challenge = nil })
-            G.GAME.seeded = false
-            VSMOD_GLOBALS.SCORES = {}
+            local used_saved_game = false
+            if G.SAVED_GAME ~= nil then
+                print("saved game exists")
+                print(json.encode(G.SAVED_GAME))
+                if G.SAVED_GAME.GAME.stake == game_data.stake then
+                    print("Stake matches: " .. G.SAVED_GAME.GAME.stake)
+                else
+                    print("Stake does not match: " .. G.SAVED_GAME.GAME.stake .. " vs " .. game_data.stake)
+                end
+                if G.SAVED_GAME.GAME.pseudorandom.seed == game_data.seed then
+                    print("Seed matches: " .. G.SAVED_GAME.GAME.pseudorandom.seed)
+                else
+                    print("Seed does not match: " .. G.SAVED_GAME.GAME.pseudorandom.seed .. " vs " .. game_data.seed)
+                end
+                if G.SAVED_GAME.BACK.name == game_data.deck then
+                    print("Deck matches: " .. G.SAVED_GAME.BACK.name)
+                else
+                    print("Deck does not match: " .. G.SAVED_GAME.BACK.name .. " vs " .. game_data.deck)
+                end
+
+                if G.SAVED_GAME.GAME.stake == game_data.stake and G.SAVED_GAME.GAME.pseudorandom.seed == game_data.seed and G.SAVED_GAME.BACK.name == game_data.deck then
+                    G:start_run({savetext = G.SAVED_GAME})
+                    used_saved_game = true
+                end
+            end
+            if not used_saved_game then
+                G.GAME.viewed_back = get_deck_from_name(game_data.deck)
+                G.GAME.selected_back = G.GAME.viewed_back
+                G.FUNCS.start_run(nil, { stake = game_data.stake, seed = game_data.seed, challenge = nil })
+                G.GAME.seeded = false
+                VSMOD_GLOBALS.SCORES = {}
+            end
         elseif decoded.type == "declare_winner" then
             local winning_data = json.decode(decoded.data)
             VSMOD_GLOBALS.REWARDS[winning_data.prize_type](json.decode(winning_data.prize_value), winning_data.won)
@@ -672,7 +709,7 @@ function makeMultiplayerTab()
     local btn = UIBox_button { button = fn, colour = G.C.BLUE, minw = 2.65, minh = 1.35, label = { label_txt }, scale = 1.2, col = true }
     return {
         n = G.UIT.ROOT,
-        config = { align = "cm", padding = 0.05, colour = G.C.CLEAR },
+        config = { align = "cm", padding = 0.05, colour = G.C.CLEAR, id = 'mp_tab_content' },
         nodes = {
             {
                 n = G.UIT.C,
@@ -699,6 +736,14 @@ function makeMultiplayerTab()
             }
         }
     }
+end
+
+G.FUNCS.opp_chip_UI_set = function(e)
+    local new_chips_text = number_format(VSMOD_GLOBALS.opponent_chips)
+    if G.GAME.chips_text ~= new_chips_text then
+        e.config.scale = math.min(0.8, scale_number(VSMOD_GLOBALS.opponent_chips, 1.1))
+        VSMOD_GLOBALS.VISUAL_OPPONENT_SCORE = new_chips_text
+    end
 end
 
 function onHandScored(hand_score)
@@ -757,12 +802,12 @@ function getOpponentScoreUI()
                                 n = G.UIT.T,
                                 config = {
                                     ref_table = VSMOD_GLOBALS,
-                                    ref_value = 'opponent_chips',
+                                    ref_value = 'VISUAL_OPPONENT_SCORE',
                                     lang = G.LANGUAGES['en-us'],
                                     scale = 0.85,
                                     colour = G.C.WHITE,
-                                    id = 'chip_UI_count',
-                                    func = 'chip_UI_set',
+                                    id = 'opp_chip_UI_count',
+                                    func = 'opp_chip_UI_set',
                                     shadow = true
                                 }
                             }
@@ -793,7 +838,7 @@ SMODS.Atlas {
 SMODS.Atlas {
     key = "VersusConsumables",
     path = "tarot.png",
-    px = 69,
+    px = 63,
     py = 93
 }
 
