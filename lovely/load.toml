@@ -1,20 +1,9 @@
 [manifest]
 version = "1.0.0"
-
-[[patches]]
-[patches.copy]
-target = "main.lua"
-position = "append"
-sources = ["src/core.lua"]
+priority = 1
 
 [[patches]]
 [patches.module]
 source = "lib/json.lua"
 before = "main.lua"
 name = "json"
-
-[[patches]]
-[patches.module]
-source = "lib/nativefs/nativefs.lua"
-before = "main.lua"
-name = "nativefs"

@@ -1,4 +1,4 @@
-# ![logo](resources/1x/versus-logo.png)
+# ![logo](assets/1x/versus-logo.png)
 
 ## Balatro Versus Mod
 
@@ -26,7 +26,7 @@ The balatro versus mod is a 2+ player experience (in early development) in which
 
 ## Installation
 
-This mod requires [lovely injector](https://github.com/ethangreen-dev/lovely-injector), as of writing, it is installed by downloading the latest release or artifact from actions and placing version.dll next to the exe.
+This mod requires [lovely injector](https://github.com/ethangreen-dev/lovely-injector), as of writing, it is installed by downloading the latest release or artifact from actions and placing version.dll next to the exe. This mod also requires [Steammodded](https://github.com/Steamopollys/Steamodded)
 
 
 ### Installation Method 1 (Recommended)
@@ -39,6 +39,7 @@ This mod requires [lovely injector](https://github.com/ethangreen-dev/lovely-inj
 
 ```
 git clone https://github.com/Rubyboat1207/balatro-versus.git
+git clone https://github.com/Steamopollys/Steamodded.git
 ```
 
 Whenever you need to update the mod, simply run the following in the mod's folder
@@ -57,6 +58,8 @@ git pull
 
 > [!WARNING]
 > The Folder must be named "balatro-versus" (case sensitive)
+
+4. Download and Install [Steammodded](https://github.com/Steamopollys/Steamodded) 
 
 ## Usage
 > [!NOTE]
