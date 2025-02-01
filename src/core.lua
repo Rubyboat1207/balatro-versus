@@ -16,6 +16,7 @@ VSMOD_GLOBALS = {
     CONSUMABLES = {},
     HEARTBEAT_TIMER = 15,
     TIME_SINCE_HEARTBEAT = 0,
+    VICTORY_NOTIFICATION = nil
 }
 VSMOD_GLOBALS.FUNCS = {}
 
@@ -193,6 +194,42 @@ function VSMOD_GLOBALS.FUNCS.vs_joinlobby()
     }))
 end
 
+function runVictoryNotification(won, itemName, round)
+
+    local atlas_x = 0
+    if won then
+        atlas_x = 1
+    end
+    VSMOD_GLOBALS.VICTORY_NOTIFICATION = UIBox {
+        definition = create_UiBox_victory_notification(round, won, VSMOD_GLOBALS.ICONS, {x=atlas_x,y=0}, itemName, won),
+        config = {align='cr', offset = {x=8, y=0.5},major = G.ROOM_ATTACH, bond = 'Weak'}
+    }
+    G.E_MANAGER:add_event(Event({
+        trigger = "ease",
+        blocking=false,
+        delay = 1,
+        ref_table = VSMOD_GLOBALS.VICTORY_NOTIFICATION.alignment.offset,
+        ref_value = "x",
+        ease_to = -2,
+    }))
+    G.E_MANAGER:add_event(Event({
+        trigger = "after",
+        blocking=false,
+        delay = 10,
+        func = function ()
+            G.E_MANAGER:add_event(Event({
+                trigger = "ease",
+                blocking = true,
+                delay = 1,
+                ref_table = VSMOD_GLOBALS.VICTORY_NOTIFICATION.alignment.offset,
+                ref_value = "x",
+                ease_to = 8,
+            }))
+            return true
+        end
+    }))
+end
+
 function vsmod_round_ended(game_over)
     local sendChannel = love.thread.getChannel('tcp_send')
     sendChannel:push(json.encode({
@@ -249,7 +286,11 @@ function vsmod_run_start()
 
 end
 
-function VSMOD_GLOBALS.REWARDS.random_joker(data)
+function VSMOD_GLOBALS.REWARDS.random_joker(data, won)
+    runVictoryNotification(won, "a random joker", G.GAME.round + G.GAME.skips)
+    if not won then
+        return
+    end
     G.GAME.joker_buffer = G.GAME.joker_buffer + 1
     G.E_MANAGER:add_event(Event({
         func = function()
@@ -265,7 +306,11 @@ function VSMOD_GLOBALS.REWARDS.random_joker(data)
     }))
 end
 
-function VSMOD_GLOBALS.REWARDS.create_joker(data) 
+function VSMOD_GLOBALS.REWARDS.create_joker(data, won) 
+    runVictoryNotification(won, "a " .. data.card .. " joker", G.GAME.round + G.GAME.skips)
+    if not won then
+        return
+    end
     G.GAME.joker_buffer = G.GAME.joker_buffer + 1
     G.E_MANAGER:add_event(Event({
         func = function()
@@ -293,7 +338,11 @@ function VSMOD_GLOBALS.REWARDS.create_joker(data)
     }))
 end
 
-function VSMOD_GLOBALS.REWARDS.create_consumable(data) 
+function VSMOD_GLOBALS.REWARDS.create_consumable(data, won)
+    runVictoryNotification(won, "a " .. data.card .. " card.", G.GAME.round + G.GAME.skips)
+    if not won then
+        return
+    end
     G.GAME.consumeable_buffer = G.GAME.consumeable_buffer + 1
     G.E_MANAGER:add_event(Event({
         func = function()
@@ -318,7 +367,11 @@ function VSMOD_GLOBALS.REWARDS.create_consumable(data)
     }))
 end
 
-function VSMOD_GLOBALS.REWARDS.random_consumable(data)
+function VSMOD_GLOBALS.REWARDS.random_consumable(data, won)
+    runVictoryNotification(won, "a random consumable", G.GAME.round + G.GAME.skips)
+    if not won then
+        return
+    end
     G.GAME.consumeable_buffer = G.GAME.consumeable_buffer + 1
     G.E_MANAGER:add_event(Event({
         func = function()
@@ -331,7 +384,11 @@ function VSMOD_GLOBALS.REWARDS.random_consumable(data)
     }))
 end
 
-function VSMOD_GLOBALS.REWARDS.gain_money(data)
+function VSMOD_GLOBALS.REWARDS.gain_money(data, won)
+    runVictoryNotification(won, "$" .. data, G.GAME.round + G.GAME.skips)
+    if not won then
+        return
+    end
     ease_dollars(data, false)
 end
 
@@ -376,12 +433,7 @@ function vsmod_update()
             VSMOD_GLOBALS.SCORES = {}
         elseif decoded.type == "declare_winner" then
             local winning_data = json.decode(decoded.data)
-            if winning_data.won then
-                VSMOD_GLOBALS.REWARDS[winning_data.prize_type](json.decode(winning_data.prize_value))
-                print("You won blind " .. winning_data.blind)
-            else
-                print("You lost blind " .. winning_data.blind)
-            end
+            VSMOD_GLOBALS.REWARDS[winning_data.prize_type](json.decode(winning_data.prize_value), winning_data.won)
         elseif decoded.type == "game_normal" then
             love.thread.getChannel('tcp_signal'):push('disconnect')
         elseif decoded.type == "last_on_blind" then
@@ -469,7 +521,135 @@ function initVersusMod()
     end
 
     VSMOD_GLOBALS.FUNCS.vs_connect()
-end
+    end
+
+function create_UiBox_victory_notification(roundNumber, didWin, spriteAtlas, spritePos, itemName, isPlayer)
+    -- Determine the primary and secondary text
+    local mainText = didWin and ("You won round " .. roundNumber) or ("You lost round " .. roundNumber)
+    local subText  = isPlayer and ("You got \n" .. itemName) or ("An opponent got \n" .. itemName)
+  
+    -- Create a sprite with your defined atlas/position
+    local t_s = Sprite(
+      0, 
+      0, 
+      1.5 * (spriteAtlas.px / spriteAtlas.py), -- Adjust scaling as needed
+      1.5,
+      spriteAtlas, 
+      spritePos
+    )
+    -- Disable sprite interactivity
+    t_s.states.drag.can    = false
+    t_s.states.hover.can   = false
+    t_s.states.collide.can = false
+
+    text_color = G.C.UI_MULT
+    if not didWin then
+      text_color = G.C.UI_MULT
+    end
+  
+    -- Build the UI table (UIT) structure
+    local t = {
+      n = G.UIT.ROOT,
+      config = {
+        align  = 'tr',
+        r      = 0.1,
+        padding= 0.06,
+        colour = G.C.UI.TRANSPARENT_DARK
+      },
+      nodes = {
+        {
+          n = G.UIT.R,
+          config = {
+            align          = "tr",
+            padding        = 0.2,
+            w              = 0.4,
+            minh           = 3,
+            r              = 0.1,
+            colour         = G.C.BLACK,
+            outline        = 1.5,
+            outline_colour = G.C.GREY
+          },
+          nodes = {
+            {
+              n = G.UIT.R,
+              config = {
+                align = "cm",
+                r     = 0.1
+              },
+              nodes = {
+                -- Sprite container
+                {
+                  n = G.UIT.R,
+                  config = {
+                    align = "cm",
+                    r     = 0.1
+                  },
+                  nodes = {
+                    {
+                      n = G.UIT.O,
+                      config = {
+                        object = t_s
+                      }
+                    }
+                  }
+                },
+                -- Text container
+                {
+                  n = G.UIT.R,
+                  config = {
+                    align   = "cm",
+                    padding = 0.04
+                  },
+                  nodes = {
+                    {
+                      n = G.UIT.R,
+                      config = {
+                        align = "cm",
+                        maxw  = 1.4
+                      },
+                      nodes = {
+                        {
+                          n = G.UIT.T,
+                          config = {
+                            text   = mainText,
+                            scale  = 0.5,
+                            colour = G.C.FILTER,
+                            shadow = true
+                          }
+                        }
+                      }
+                    },
+                    {
+                      n = G.UIT.R,
+                      config = {
+                        align = "cm",
+                        maxw  = 3.4
+                      },
+                      nodes = {
+                        {
+                          n = G.UIT.T,
+                          config = {
+                            text   = subText,
+                            scale  = 0.2,
+                            colour = G.C.FILTER,
+                            shadow = true,
+                            w = 0.5
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  
+    return t
+  end
+  
 
 function makeMultiplayerTab()
     local ptext = "Versus Opponent IP"
@@ -590,6 +770,15 @@ function getOpponentScoreUI()
     }
 end
 
+function vsmod_drawVictoryNotif()
+    if VSMOD_GLOBALS.VICTORY_NOTIFICATION then
+        love.graphics.push()
+            VSMOD_GLOBALS.VICTORY_NOTIFICATION:translate_container()
+            VSMOD_GLOBALS.VICTORY_NOTIFICATION:draw()
+        love.graphics.pop()
+    end
+end
+
 SMODS.Atlas {
     key = "VersusJokers",
     path = "jokers.png",
@@ -602,6 +791,13 @@ SMODS.Atlas {
     path = "tarot.png",
     px = 69,
     py = 93
+}
+
+VSMOD_GLOBALS.ICONS = SMODS.Atlas {
+    key = "VersusIcons",
+    path = "icons.png",
+    px = 64,
+    py = 64
 }
 
 VSMOD_GLOBALS.JOKERS.ghoulish_imp = SMODS.Joker {
