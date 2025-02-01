@@ -470,7 +470,7 @@ function vsmod_update()
                 card = valid_cards
             end
 
-            if is_single_card then
+            if not is_single_card then
                 for _, selected_card in ipairs(card) do
                     VSMOD_GLOBALS.CARD_EFFECTS[data.effect](selected_card)
                 end
