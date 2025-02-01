@@ -837,7 +837,7 @@ VSMOD_GLOBALS.JOKERS.ghoulish_imp = SMODS.Joker {
                     return {
                         message = "curse",
                         colour = G.C.MULT,
-                        card = self
+                        card = card
                     }
                 end
             end
