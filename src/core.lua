@@ -445,7 +445,7 @@ function vsmod_update()
             end
             
             local data = json.decode(decoded.data)
-            
+            local is_single_card = false
             local valid_cards = {}
             
             for k, v in ipairs(G.hand.cards) do
@@ -462,6 +462,7 @@ function vsmod_update()
             local card = nil
             
             if data.selector == "random" then
+                is_single_card = true
                 card = pseudorandom_element(valid_cards, pseudoseed('select'))
             end
             
@@ -469,7 +470,7 @@ function vsmod_update()
                 card = valid_cards
             end
 
-            if type(card) == "table" then
+            if is_single_card then
                 for _, selected_card in ipairs(card) do
                     VSMOD_GLOBALS.CARD_EFFECTS[data.effect](selected_card)
                 end
