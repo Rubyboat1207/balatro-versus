@@ -14,15 +14,15 @@ The balatro versus mod is a 2+ player experience (in early development) in which
   - Money
   - Perishable Joker
   - Random Consumable Card
+- New multiplayer focused joker & a consumable (with more on the way)
+- Notifications to show winners/losers
+- A centralized server with lobbies
 
 ### Planned Changes (In no particular order)
 
-- [New multiplayer focused jokers & Consumables](https://github.com/Rubyboat1207/balatro-versus/tree/steammodded)
-- Notifications to show winners/losers
 - Extra UI features
 - A P2P mode
 - Server UI
-- [Centralized servers with lobbies (instead of/in addition to dedicated servers)](https://github.com/Rubyboat1207/balatro-versus/tree/lobby) or [this alternate branch with jokers](https://github.com/Rubyboat1207/balatro-versus/tree/lobby-steammodded)
 
 ## Installation
 
