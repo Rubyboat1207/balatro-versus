@@ -302,6 +302,15 @@ function VSMOD_GLOBALS.REWARDS.create_card(data, won)
     if not won then
         return
     end
+    local cardType = data.type or "Joker"
+    local area
+    if cardType == "Joker" then
+        area = G.jokers
+        G.GAME.joker_buffer = G.GAME.joker_buffer + 1
+    else
+        area = G.consumeables
+        G.GAME.consumeable_buffer = G.GAME.consumeable_buffer + 1
+    end
     G.GAME.joker_buffer = G.GAME.joker_buffer + 1
     G.E_MANAGER:add_event(Event({
         func = function()
@@ -315,9 +324,13 @@ function VSMOD_GLOBALS.REWARDS.create_card(data, won)
                 card:set_edition(data.edition, true)
             end
             card:add_to_deck()
-            G.jokers:emplace(card)
+            area:emplace(card)
             card:start_materialize()
-            G.GAME.joker_buffer = G.GAME.joker_buffer - 1
+            if cardType == "Joker" then
+                G.GAME.joker_buffer = G.GAME.joker_buffer - 1
+            else
+                G.GAME.consumeable_buffer = G.GAME.consumeable_buffer - 1
+            end
             return true
         end
     }))
@@ -332,7 +345,7 @@ function VSMOD_GLOBALS.REWARDS.random_card(data, won)
     end
 
     area = nil
-    if card_type == "jokers" then
+    if data.card_type == "Joker" then
         area = G.jokers
         G.GAME.joker_buffer = G.GAME.joker_buffer + 1
     else
@@ -343,7 +356,7 @@ function VSMOD_GLOBALS.REWARDS.random_card(data, won)
     
     G.E_MANAGER:add_event(Event({
         func = function()
-            local card = create_card(data, area, nil, nil, nil, nil, nil, 'pri')
+            local card = create_card(data.card_type, area, nil, data.rarity or nil, nil, nil, nil, 'pri')
             card:add_to_deck()
             if data == "jokers" then
                 G.jokers:emplace(card)
