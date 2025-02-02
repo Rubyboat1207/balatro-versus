@@ -331,8 +331,6 @@ function VSMOD_GLOBALS.REWARDS.random_card(data, won)
         return
     end
 
-    card_type = pseudorandom_element(data, pseudoseed('random_card' .. G.GAME.round_resets.ante .. G.GAME.round))
-
     area = nil
     if card_type == "jokers" then
         area = G.jokers
@@ -347,7 +345,7 @@ function VSMOD_GLOBALS.REWARDS.random_card(data, won)
         func = function()
             local card = create_card(data, area, nil, nil, nil, nil, nil, 'pri')
             card:add_to_deck()
-            if card_type == "jokers" then
+            if data == "jokers" then
                 G.jokers:emplace(card)
                 card:start_materialize()
                 G.GAME.joker_buffer = G.GAME.joker_buffer - 1
