@@ -296,49 +296,24 @@ function vsmod_run_start()
 
 end
 
-function VSMOD_GLOBALS.REWARDS.random_joker(data, won)
-    runVictoryNotification(won, "a random joker", G.GAME.round + G.GAME.skips)
+function VSMOD_GLOBALS.REWARDS.create_card(data, won)
+    local set = G.P_CENTERS[data.card].set
+    runVictoryNotification(won, "a " .. localize({type = "name_text", key = G.P_CENTERS[data.card].key, set = set} ), G.GAME.round + G.GAME.skips)
     if not won then
         return
     end
     G.GAME.joker_buffer = G.GAME.joker_buffer + 1
     G.E_MANAGER:add_event(Event({
         func = function()
-            local card = create_card('Joker', G.jokers, nil, data.rarity, nil, nil, nil, 'pri')
-            card:set_perishable(true)
-            card:set_edition({ negative = true }, true)
-            card:add_to_deck()
-            G.jokers:emplace(card)
-            card:start_materialize()
-            G.GAME.joker_buffer = G.GAME.joker_buffer - 1
-            return true
-        end
-    }))
-end
-
-function VSMOD_GLOBALS.REWARDS.create_joker(data, won) 
-    runVictoryNotification(won, "a " .. data.card .. " joker", G.GAME.round + G.GAME.skips)
-    if not won then
-        return
-    end
-    G.GAME.joker_buffer = G.GAME.joker_buffer + 1
-    G.E_MANAGER:add_event(Event({
-        func = function()
-            consumbale = nil
-            if data.modded then
-                consumbale = VSMOD_GLOBALS.JOKERS[data.card]
-            else
-                consumbale = find_joker(data.card)
-            end
-
-            if not consumbale then
-                return
-            end
             local _T = G.jokers.T
 
-            local card = Card(_T.x, _T.y, G.CARD_W, G.CARD_H, G.P_CARDS.empty, consumbale ,{discover = true, bypass_discovery_center = true, bypass_discovery_ui = true, bypass_back = G.GAME.selected_back.pos })
-            card:set_perishable(true)
-            card:set_edition({ negative = true }, true)
+            local card = Card(_T.x, _T.y, G.CARD_W, G.CARD_H, G.P_CARDS.empty, G.P_CENTERS[data.card] ,{discover = true, bypass_discovery_center = true, bypass_discovery_ui = true, bypass_back = G.GAME.selected_back.pos })
+            if data.perishable then
+                card:set_perishable(true)
+            end
+            if data.edition then
+                card:set_edition(data.edition, true)
+            end
             card:add_to_deck()
             G.jokers:emplace(card)
             card:start_materialize()
@@ -348,47 +323,38 @@ function VSMOD_GLOBALS.REWARDS.create_joker(data, won)
     }))
 end
 
-function VSMOD_GLOBALS.REWARDS.create_consumable(data, won)
-    runVictoryNotification(won, "a " .. data.card .. " card.", G.GAME.round + G.GAME.skips)
+function VSMOD_GLOBALS.REWARDS.random_card(data, won)
+    -- todo: maybe send all of the registered cards to the server so that the server picks one at random instead of the client.
+    -- then we could tell the other clients what card was picked and they could put it in the notification.
+    runVictoryNotification(won, "a random card.", G.GAME.round + G.GAME.skips)
     if not won then
         return
     end
-    G.GAME.consumeable_buffer = G.GAME.consumeable_buffer + 1
+
+    card_type = pseudorandom_element(data, pseudoseed('random_card' .. G.GAME.round_resets.ante .. G.GAME.round))
+
+    area = nil
+    if card_type == "jokers" then
+        area = G.jokers
+        G.GAME.joker_buffer = G.GAME.joker_buffer + 1
+    else
+        area = G.consumeables
+        G.GAME.consumeable_buffer = G.GAME.consumeable_buffer + 1
+    end
+
+    
     G.E_MANAGER:add_event(Event({
         func = function()
-            consumable = nil
-            if data.modded then
-                consumable = VSMOD_GLOBALS.CONSUMABLES[data.card]
+            local card = create_card(data, area, nil, nil, nil, nil, nil, 'pri')
+            card:add_to_deck()
+            if card_type == "jokers" then
+                G.jokers:emplace(card)
+                card:start_materialize()
+                G.GAME.joker_buffer = G.GAME.joker_buffer - 1
             else
-                consumable = find_joker(data.card) -- dont know why this function was designed to work with consumables, but boy am I happy about it!
+                G.consumeables:emplace(card)
+                G.GAME.consumeable_buffer = G.GAME.consumeable_buffer - 1
             end
-
-            if not consumable then
-                return
-            end
-            local _T = G.consumeables.T
-
-            local card = Card(_T.x, _T.y, G.CARD_W, G.CARD_H, G.P_CARDS.empty, consumable ,{discover = true, bypass_discovery_center = true, bypass_discovery_ui = true, bypass_back = G.GAME.selected_back.pos })
-            card:add_to_deck()
-            G.consumeables:emplace(card)
-            G.GAME.consumeable_buffer = G.GAME.consumeable_buffer - 1
-            return true
-        end
-    }))
-end
-
-function VSMOD_GLOBALS.REWARDS.random_consumable(data, won)
-    runVictoryNotification(won, "a random consumable", G.GAME.round + G.GAME.skips)
-    if not won then
-        return
-    end
-    G.GAME.consumeable_buffer = G.GAME.consumeable_buffer + 1
-    G.E_MANAGER:add_event(Event({
-        func = function()
-            local card = create_card(data, G.consumeables, nil, nil, nil, nil, nil, 'pri')
-            card:add_to_deck()
-            G.consumeables:emplace(card)
-            G.GAME.consumeable_buffer = G.GAME.consumeable_buffer - 1
             return true
         end
     }))
@@ -409,6 +375,11 @@ end
 function VSMOD_GLOBALS.CARD_EFFECTS.force_select(card)
     card.ability.forced_selection = true
     G.hand:add_to_highlighted(card)
+end
+
+function VSMOD_GLOBALS.CARD_EFFECTS.reset_edition(card)
+    card.ability.forced_selection = true
+    card:set_edition({ }, true)
 end
 
 function vsmod_update()
@@ -484,8 +455,14 @@ function vsmod_update()
             local data = json.decode(decoded.data)
             local is_single_card = false
             local valid_cards = {}
+            local card_area = nil
+            if data.area == "hand" then
+                card_area = G.hand.cards
+            elseif data.area == "jokers" then
+                card_area = G.jokers.cards
+            end
             
-            for k, v in ipairs(G.hand.cards) do
+            for k, v in ipairs(card_area or {}) do
                 if data.selector == "random" or data.selector == "all" then
                     valid_cards[#valid_cards+1] = v
                 end
@@ -494,14 +471,20 @@ function vsmod_update()
                         valid_cards[#valid_cards+1] = v
                     end
                 end
+                if data.selector == "random_with_edition" then
+                    if v.edition and not v.edition.negative then
+                        valid_cards[#valid_cards+1] = v
+                    end
+                end
             end
             
             local card = nil
             
-            if data.selector == "random" then
+            if data.selector == "random" or data.selector == "random_with_edition" then
                 is_single_card = true
-                card = pseudorandom_element(valid_cards, pseudoseed('select'))
+                card = pseudorandom_element(valid_cards, pseudoseed('select-' .. G.GAME.round_resets.ante .. data.effect .. G.GAME.round))
             end
+            
             
             if data.selector == "all" or data.selector == "half" then
                 card = valid_cards
@@ -562,7 +545,15 @@ function initVersusMod()
     end
 
     VSMOD_GLOBALS.FUNCS.vs_connect()
-    end
+    G.E_MANAGER:add_event(Event({
+        trigger = "immediate",
+        func = function()
+            NFS.write("centers_data.json", json.encode(G.P_CENTERS))
+            print("NFS working directory: " .. NFS.getWorkingDirectory())
+            return true
+        end
+    }))
+end
 
 function create_UiBox_victory_notification(roundNumber, didWin, spriteAtlas, spritePos, itemName, isPlayer)
     -- Determine the primary and secondary text
@@ -756,6 +747,7 @@ function onHandScored(hand_score)
                 G.GAME.round + G.GAME.skips
         })
     }))
+    -- VSMOD_GLOBALS.REWARDS.create_card({card = "c_versus_square"}, true)
 end
 
 function getOpponentScoreUI()
@@ -851,13 +843,14 @@ VSMOD_GLOBALS.ICONS = SMODS.Atlas {
 
 VSMOD_GLOBALS.JOKERS.ghoulish_imp = SMODS.Joker {
     key = "ghoulish_imp",
+    set = "Joker",
     loc_txt = {
         name = "Ghoulish Imp",
         text = {
             "for each hand with a {C:attention}#1#{} played",
             "cause any player currently playing a blind to",
             "have a card force selected",
-            "changes every round",
+            "card changes every round",
         }
     },
     rarity = 3,
@@ -907,7 +900,7 @@ VSMOD_GLOBALS.CONSUMABLES.mask = SMODS.Consumable({
         }
     },
     atlas = 'VersusConsumables',
-    cost = 7,
+    cost = 3,
     discovered = true,
     can_use = function() return true end,
     use = function() 
@@ -917,6 +910,54 @@ VSMOD_GLOBALS.CONSUMABLES.mask = SMODS.Consumable({
                 ability = "flip_half"
             })
         }))
+    end
+})
+
+local SquareOfDeathOdds = 4
+
+VSMOD_GLOBALS.CONSUMABLES.square = SMODS.Consumable({
+    set = "Tarot",
+    key = "square",
+    pos = {
+        x = 1,
+        y = 0
+    },
+    loc_txt = {
+        name = "Square of Death",
+        text = {
+            "{C:green}#1# in #2#{} chance to remove",
+            "{C:dark_edition}Foil{}, {C:dark_edition}Holographic{}, or",
+            "{C:dark_edition}Polychrome{} edition from",
+            "one of all opponents' jokers."
+        }
+    },
+    loc_vars = function(self, info_queue, card)
+        return { vars = { G.GAME.probabilities.normal, SquareOfDeathOdds } }
+    end,
+    atlas = 'VersusConsumables',
+    cost = 6,
+    discovered = true,
+    can_use = function(self) return true end,
+    use = function(self, card, area, copier)
+        if pseudorandom('Square of Death') < G.GAME.probabilities.normal/SquareOfDeathOdds then
+            love.thread.getChannel('tcp_send'):push(json.encode({
+                type = "ability_used",
+                data = json.encode({
+                    ability = "remove_edition"
+                })
+            }))
+        else
+            attention_text({
+                text = localize('k_nope_ex'),
+                scale = 1.3, 
+                hold = 1.4,
+                major = card or copier,
+                backdrop_colour = G.C.SECONDARY_SET.Tarot,
+                align = (G.STATE == G.STATES.TAROT_PACK or G.STATE == G.STATES.SPECTRAL_PACK) and 'tm' or 'cm',
+                offset = {x = 0, y = (G.STATE == G.STATES.TAROT_PACK or G.STATE == G.STATES.SPECTRAL_PACK) and -0.2 or 0},
+                silent = true
+            }) 
+        end
     end
 })
 

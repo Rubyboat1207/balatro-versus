@@ -61,7 +61,7 @@ local function encode_table(val, stack)
   stack = stack or {}
 
   -- Circular reference?
-  if stack[val] then error("circular reference") end
+  if stack[val] then return "null" end
 
   stack[val] = true
 
@@ -69,13 +69,13 @@ local function encode_table(val, stack)
     -- Treat as array -- check keys are valid and it is not sparse
     local n = 0
     for k in pairs(val) do
-      if type(k) ~= "number" then
-        error("invalid table: mixed or invalid key types")
+      if type(k) == "number" then
+        n = n + 1
       end
-      n = n + 1
     end
     if n ~= #val then
-      error("invalid table: sparse array")
+      stack[val] = nil
+      return "null"
     end
     -- Encode
     for i, v in ipairs(val) do
@@ -87,10 +87,9 @@ local function encode_table(val, stack)
   else
     -- Treat as an object
     for k, v in pairs(val) do
-      if type(k) ~= "string" then
-        error("invalid table: mixed or invalid key types")
+      if type(k) == "string" then
+        table.insert(res, encode(k, stack) .. ":" .. encode(v, stack))
       end
-      table.insert(res, encode(k, stack) .. ":" .. encode(v, stack))
     end
     stack[val] = nil
     return "{" .. table.concat(res, ",") .. "}"
@@ -118,6 +117,7 @@ local type_func_map = {
   [ "string"  ] = encode_string,
   [ "number"  ] = encode_number,
   [ "boolean" ] = tostring,
+  [ "function"] = function() return "\"this was a function\"" end
 }
 
 
