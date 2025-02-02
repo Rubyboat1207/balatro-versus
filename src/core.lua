@@ -302,9 +302,8 @@ function VSMOD_GLOBALS.REWARDS.create_card(data, won)
     if not won then
         return
     end
-    local cardType = data.type or "Joker"
     local area
-    if cardType == "Joker" then
+    if set == "Joker" then
         area = G.jokers
         G.GAME.joker_buffer = G.GAME.joker_buffer + 1
     else
