@@ -214,7 +214,6 @@ function VSMOD_GLOBALS.FUNCS.vs_joinlobby()
         })
     }))
 
-    G.STEAM.friends.setRichPresence("text", "In Lobby")
     G.STEAM.friends.setRichPresence("connect", VSMOD_GLOBALS.ip_address .. "|" .. VSMOD_GLOBALS.lobby_id)
 end
 
@@ -589,7 +588,6 @@ function initVersusMod()
             NFS.write("centers_data.json", json.encode(G.P_CENTERS))
             if G.STEAM then
                 NFS.write("steam_data.json", json.encode(G.STEAM))
-                G.STEAM.friends.setRichPresence("text", "Playing Versus Mod")
 
                 function G.STEAM.friends.onGameRichPresenceJoinRequested(data)
                     local connection_string = data.connect
