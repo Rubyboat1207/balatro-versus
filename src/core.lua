@@ -370,7 +370,7 @@ function VSMOD_GLOBALS.REWARDS.random_card(data, won)
         func = function()
             local card = create_card(data.card_type, area, nil, data.rarity or nil, nil, nil, nil, 'pri')
             card:add_to_deck()
-            if data == "Joker" then
+            if data.card_type == "Joker" then
                 G.jokers:emplace(card)
                 card:start_materialize()
                 G.GAME.joker_buffer = G.GAME.joker_buffer - 1
@@ -536,7 +536,7 @@ function vsmod_update()
 
             if data.effect == 'level' then
                 local level = data.modifier or 1
-                
+                update_hand_text({immediate = true, nopulse = true, delay = 0}, {mult = 0, chips = 0, level = '', handname = hand})
                 level_up_hand(nil, hand, false, level)
             end
         end

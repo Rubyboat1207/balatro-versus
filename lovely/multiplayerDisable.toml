@@ -1,0 +1,25 @@
+[manifest]
+version = "1.0.0"
+
+[[patches]]
+[patches.pattern]
+target = "functions/common_events.lua"
+pattern = "local add = nil"
+position = "after"
+match_indent = true
+payload = """
+if not VSMOD_GLOBALS.in_lobby then
+    if(v.key:find("_versus")) then
+        goto continue
+    end
+end
+"""
+
+[[patches]]
+[patches.pattern]
+target = "functions/common_events.lua"
+pattern = """_pool[#_pool + 1] = 'UNAVAILABLE'
+            end"""
+match_indent = true
+position = "after"
+payload = "::continue::"
