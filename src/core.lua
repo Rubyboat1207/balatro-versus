@@ -512,6 +512,20 @@ function vsmod_update()
             VSMOD_GLOBALS.TIME_SINCE_HEARTBEAT = 0
         elseif decoded.type == 'lobby_joined' then
             VSMOD_GLOBALS.in_lobby = true
+        elseif decoded.type == 'hand_type_effect' then
+            local data = json.decode(decoded.data)
+            local hand = nil
+            if data.selector == 'highest' then
+                hand = G.GAME.current_round.most_played_poker_hand or "Flush"
+            elseif data.selector == 'recent' then
+                hand = G.GAME.last_hand_played or "Flush"
+            end
+
+            if data.effect == 'level' then
+                local level = data.modifier or 1
+                
+                level_up_hand(nil, hand, false, level)
+            end
         end
     end
 end
@@ -844,6 +858,13 @@ SMODS.Atlas {
     py = 93
 }
 
+SMODS.Atlas {
+    key = "VersusPlanets",
+    path = "planets.png",
+    px = 63,
+    py = 93
+}
+
 VSMOD_GLOBALS.ICONS = SMODS.Atlas {
     key = "VersusIcons",
     path = "icons.png",
@@ -910,7 +931,7 @@ VSMOD_GLOBALS.CONSUMABLES.mask = SMODS.Consumable({
         }
     },
     atlas = 'VersusConsumables',
-    cost = 3,
+    cost = 2,
     discovered = true,
     can_use = function() return true end,
     use = function() 
@@ -945,7 +966,7 @@ VSMOD_GLOBALS.CONSUMABLES.square = SMODS.Consumable({
         return { vars = { G.GAME.probabilities.normal, SquareOfDeathOdds } }
     end,
     atlas = 'VersusConsumables',
-    cost = 6,
+    cost = 1,
     discovered = true,
     can_use = function(self) return true end,
     use = function(self, card, area, copier)
@@ -968,6 +989,34 @@ VSMOD_GLOBALS.CONSUMABLES.square = SMODS.Consumable({
                 silent = true
             }) 
         end
+    end
+})
+
+VSMOD_GLOBALS.CONSUMABLES.europa = SMODS.Consumable({
+    set = "Planet",
+    key = "europa",
+    pos = {
+        x = 0,
+        y = 0
+    },
+    loc_txt = {
+        name = "Europa",
+        text = {
+            "Levels down the most played hand",
+            "of your opponents",
+        }
+    },
+    atlas = 'VersusPlanets',
+    cost = 3,
+    discovered = true,
+    can_use = function() return true end,
+    use = function() 
+        love.thread.getChannel('tcp_send'):push(json.encode({
+            type = "ability_used",
+            data = json.encode({
+                ability = "down_level_hand"
+            })
+        }))
     end
 })
 
