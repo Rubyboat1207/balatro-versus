@@ -7,7 +7,9 @@ VSMOD_GLOBALS = {
     connection_state = {
         connected = false,
         awaiting_connect = false,
-        just_connected = false
+        just_connected = false,
+        queued_connection_ip = nil,
+        queued_connection_lobby = nil
     },
     CARD_EFFECTS = {},
     REWARDS = {},
@@ -133,6 +135,10 @@ local function monitor_connection()
                 signal:push('disconnect')
             end
         end
+    elseif cs.queued_connection_ip then
+        VSMOD_GLOBALS.ip_address = cs.queued_connection_ip
+        cs.queued_connection_ip = nil
+        connect()
     end
     
 
@@ -151,6 +157,11 @@ local function monitor_connection()
 
     if latest_signal == "connected" then
         VSMOD_GLOBALS.connection_state.just_connected = true
+        if cs.queued_connection_lobby then
+            VSMOD_GLOBALS.lobby_id = cs.queued_connection_lobby
+            cs.queued_connection_lobby = nil
+            VSMOD_GLOBALS.FUNCS.vs_joinlobby()
+        end
         signal:pop()
     end
 
@@ -202,6 +213,9 @@ function VSMOD_GLOBALS.FUNCS.vs_joinlobby()
             lobby_id = VSMOD_GLOBALS.lobby_id
         })
     }))
+
+    G.STEAM.friends.setRichPresence("text", "In Lobby")
+    G.STEAM.friends.setRichPresence("connect", VSMOD_GLOBALS.ip_address .. "|" .. VSMOD_GLOBALS.lobby_id)
 end
 
 function runVictoryNotification(won, itemName, round)
@@ -573,11 +587,27 @@ function initVersusMod()
         trigger = "immediate",
         func = function()
             NFS.write("centers_data.json", json.encode(G.P_CENTERS))
-            print("NFS working directory: " .. NFS.getWorkingDirectory())
+            if G.STEAM then
+                NFS.write("steam_data.json", json.encode(G.STEAM))
+                G.STEAM.friends.setRichPresence("text", "Playing Versus Mod")
+
+                function G.STEAM.friends.onGameRichPresenceJoinRequested(data)
+                    local connection_string = data.connect
+                    local split_data = {}
+                    for part in string.gmatch(connection_string, "([^|]+)") do
+                        table.insert(split_data, part)
+                    end
+                    VSMOD_GLOBALS.connection_state.queued_connection_ip = split_data[1]
+                    VSMOD_GLOBALS.connection_state.queued_connection_lobby = split_data[2]
+                end
+            end
             return true
         end
     }))
+    
 end
+
+
 
 function create_UiBox_victory_notification(roundNumber, didWin, spriteAtlas, spritePos, itemName, isPlayer)
     -- Determine the primary and secondary text
