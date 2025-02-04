@@ -58,7 +58,7 @@ local function connect()
             -- Handle incoming messages
             local data, status = tcp:receive("*l")
             if data then
-                printoutChannel:push(data .. "\n")
+                printoutChannel:push(data)
             end
             if status == "closed" then
                 break
@@ -130,7 +130,7 @@ local function monitor_connection()
             end
 
             VSMOD_GLOBALS.TIME_SINCE_HEARTBEAT = VSMOD_GLOBALS.TIME_SINCE_HEARTBEAT + dt
-            if VSMOD_GLOBALS.TIME_SINCE_HEARTBEAT > 5 then
+            if VSMOD_GLOBALS.TIME_SINCE_HEARTBEAT > 30 then
                 print('connection didnt respond to the heartbeat fast enough. disconnecting')
                 signal:push('disconnect')
             end
@@ -469,7 +469,7 @@ function vsmod_update()
         elseif decoded.type == "game_normal" then
             love.thread.getChannel('tcp_signal'):push('disconnect')
         elseif decoded.type == "last_on_blind" then
-            VSMOD_GLOBALS.last_on_blind[json.decode(decoded.data)] = true
+            VSMOD_GLOBALS.last_on_blind["" .. json.decode(decoded.data)] = true
         elseif decoded.type == "hand_effect" then
             if G.STATE >= 3 then
                 return
